@@ -1,0 +1,174 @@
+library(gamlss)
+library(fitdistrplus)
+library(R.utils)
+#library(ggplot2)
+
+folderIn <- "Data"
+fdl <- "dl"
+farea <- "area"
+folderOut <- "Output"
+fplot <- "plots"
+
+set.seed(18061815)
+
+
+###########################
+###########################
+####### Common data #######
+###########################
+###########################
+
+
+# Look-up table
+download.file("https://ramp0storage.blob.core.windows.net/referencedata/lookUp-GB.csv.gz",file.path(folderIn,fdl,"lookUp-GB.csv.gz"))
+gunzip(file.path(folderIn,fdl,"lookUp-GB.csv.gz"))
+lu <- read.csv(file.path(folderIn,fdl,"lookUp-GB.csv"))
+
+# Load an area
+loadArea <- function(name,date,country = "England"){
+  fileName <- paste("pop_",name,"_",date,".csv",sep = "")
+  url <- paste("https://ramp0storage.blob.core.windows.net/countydata-v2/",country,"/",date,"/",fileName,".gz",sep = "")
+  download.file(url,file.path(folderIn,farea,paste(fileName,".gz",sep = "")))
+  gunzip(file.path(folderIn,farea,paste(fileName,".gz",sep = "")))
+  res <- read.csv(file.path(folderIn,farea,fileName))
+  return(res)
+}
+
+# Test areas
+dataWY <- loadArea("west-yorkshire",2020)
+dataL <- loadArea("greater-london",2020)
+dataR <- loadArea("rutland",2020)
+dataC <- loadArea("cheshire",2020)
+
+
+##########################################################
+##########################################################
+####### Algorithm 1: Cluster within synthetic data #######
+##########################################################
+##########################################################
+
+
+#####
+##### Moment-based approach
+#####
+
+# Extract first four moments for one distribution as vector
+findmoments <- function(dstrb){
+  step <- descdist(dstrb, discrete = FALSE)
+  return(c(step$mean,step$sd,step$skewness,step$kurtosis))
+}
+
+# Extract first four moments for geographic area at a specific scale
+moments <- function(var,data,scale = c("All","OA11CD","LSOA11CD","MSOA11CD","LAD20CD"),lu){
+  varN <- which(colnames(data) == var)
+  scale <- match.arg(scale)
+  if(scale == "All"){
+    scaleV <- list(unique(data$OA11CD))
+    names(scaleV) <- "ALL"
+    l <- 1
+  } else{
+    luS <- lu[which(lu$OA11CD %in% data$OA11CD),]
+    scaleN <- which(colnames(lu) == scale)
+    temp <- unique(luS[,scaleN])
+    l <- length(temp)
+    scaleV <- rep(list(NA),l)
+    names(scaleV) <- temp
+    for(i in 1:l){
+      scaleV[[i]] <- unique(luS$OA11CD[luS$MSOA11CD == temp[i]])
+    }
+  }
+  res <- data.frame(area = rep(NA,l), mean = NA, sd = NA, skewness = NA, kurtosis = NA)
+  for(i in 1:l){
+    ref <- which(data$OA11CD %in% scaleV[[i]])
+    res[i,1] <- names(scaleV)[i]
+    res[i,2:5] <- findmoments(data[ref,varN])
+  }
+  return(res)
+}
+
+# Create heatmap
+hmap <- function(data,title){
+  dev.off()
+  data2 <- data[,2:5]
+  rownames(data2) <- data[,1]
+  heatmap(t(as.matrix(data2)),margins =c(10,0),main = title,Rowv = NA)
+}
+
+## Tests
+
+# Age / MSOA
+testR <- moments("age",dataR,scale = "MSOA11CD",lu)
+testWY <- moments("age",dataWY,scale = "MSOA11CD",lu)
+testL <- moments("age",dataL,scale = "MSOA11CD",lu)
+testC <- moments("age",dataC,scale = "MSOA11CD",lu)
+
+hmap(testR,"Rutland - Age")
+hmap(testWY,"West Yorkshire - Age")
+hmap(testL,"London - Age")
+hmap(testC,"Cheshire - Age")
+
+# Age / Entire county
+testR2 <- moments("age",dataR,scale = "All",lu)
+testWY2 <- moments("age",dataWY,scale = "All",lu)
+testL2 <- moments("age",dataL,scale = "All",lu)
+testC2 <- moments("age",dataC,scale = "All",lu)
+
+all <- rbind(testR2,testWY2,testL2,testC2)
+all$area <- c("Rutland","West_Yorkshire","London","Cheshire")
+hmap(all,"Counties")
+
+# Salary / MSOA
+dataRnotNA <- dataR[!is.na(dataR$incomeH),]
+testRSal <- moments("incomeH",dataRnotNA,scale = "MSOA11CD",lu)
+dataWYnotNA <- dataWY[!is.na(dataWY$incomeH),]
+testWYSal <- moments("incomeH",dataWYnotNA,scale = "MSOA11CD",lu)
+#testLSal <- moments("incomeH",dataL,scale = "MSOA11CD",lu)
+#testCSal <- moments("incomeH",dataC,scale = "MSOA11CD",lu)
+
+hmap(testRSal,"Rutland - Salary")
+hmap(testWYSal,"West Yorkshire - Salary")
+#hmap(testLSal,"London - Salary")
+#hmap(testCSal,"Cheshire - Salary")
+
+
+#####
+##### Distance-based approach
+#####
+
+test <- dataWY$age
+
+# 1. using fitDistPred
+
+res1 <- fitDistPred(test, k = 2, type = "realplus", trace = FALSE, rand = rand, try.gamlss = TRUE) # minimum prediction global deviance.
+res2 <- fitDistPred(dataR$age, k = 2, type = "realplus", trace = FALSE, rand = rand, try.gamlss = TRUE)
+res3 <- fitDistPred(dataC$age, k = 2, type = "realplus", trace = FALSE, rand = rand, try.gamlss = TRUE)
+
+res1bis <- res1$fits[order(names(res1$fits))]
+res2bis <- res2$fits[order(names(res2$fits))]
+res3bis <- res3$fits[order(names(res3$fits))]
+res2bis <- c(res2bis[1:7],NA,NA,res2bis[8:18])
+res3bis <- c(res3bis[1:7],NA,res3bis[8:19])
+
+plot(res1bis,res2bis,pch = 20, col = alpha(1, alpha = 0.3))
+cor(res1bis,res2bis,use = "pairwise.complete.obs")
+cor(res1bis,res3bis,use = "pairwise.complete.obs")
+cor(res3bis,res2bis,use = "pairwise.complete.obs")
+
+# 2. using chooseDist
+
+testDF <- data.frame(y = dataR$age, x = 1)
+resCD <- gamlss(y~1, family=NO, data=testDF)
+t2 <- chooseDist(resCD, type="realline", parallel="snow", ncpus=4)
+t2
+
+#getOrder(t2,3)
+
+
+#################################################
+#################################################
+####### Algorithm 2: Compare to real data #######
+#################################################
+#################################################
+
+# /!\ /!\ /!\ try SDMetrics 
+
