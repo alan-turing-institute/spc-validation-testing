@@ -2,7 +2,7 @@
 
 WIP to create a robust data validation method for https://github.com/alan-turing-institute/uatk-spc
 
-## Original issue:
+## Original issue
 
 **Algorithm 1** learns the SPC dataset, attempts to cluster distributions & flags outliers
 
@@ -18,6 +18,6 @@ Then, when a user wants to check a particular output:
 
 - The user is prompted whether they want to readjust their synthetic population and how
 
-By extension, the same adjustment can be made to model future data
+By extension, the same adjustment can be made to model future data.
 
 NB: ideally, algorithm 1 and 2 would "co-learn" from each other.
