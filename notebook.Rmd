@@ -1,8 +1,22 @@
+---
+title: "Validation of SPC variables"
+author: "Hadrien Salat"
+date: "`r Sys.Date()`"
+output: rmarkdown::github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## Setup
+
+```{r}
 library(gamlss)
 library(fitdistrplus)
 library(R.utils)
-library(scales)
-#library(ggplot2)
 
 folderIn <- "Data"
 fdl <- "dl"
@@ -11,59 +25,44 @@ folderOut <- "Output"
 fplot <- "plots"
 
 set.seed(18061815)
+```
 
+## Get test data
 
-###########################
-###########################
-####### Common data #######
-###########################
-###########################
-
-
-# Look-up table
-if(!(file.exists(file.path(folderIn,fdl,"lookUp-GB.csv")))){
-  download.file("https://ramp0storage.blob.core.windows.net/referencedata/lookUp-GB.csv.gz",file.path(folderIn,fdl,"lookUp-GB.csv.gz"))
-  gunzip(file.path(folderIn,fdl,"lookUp-GB.csv.gz"))
-}
+We need a look-up table between geographies
+```
+download.file("https://ramp0storage.blob.core.windows.net/referencedata/lookUp-GB.csv.gz",file.path(folderIn,fdl,"lookUp-GB.csv.gz"))
+gunzip(file.path(folderIn,fdl,"lookUp-GB.csv.gz"))
 lu <- read.csv(file.path(folderIn,fdl,"lookUp-GB.csv"))
-
-# Load an area
+```
+and some test areas to evaluate the efficiency of the methods. We are using Greater London (largest county), West Yorskire, Cheshire and Rutland (smallest county).
+```
 loadArea <- function(name,date,country = "England"){
   fileName <- paste("pop_",name,"_",date,".csv",sep = "")
-  if(!(file.exists(file.path(folderIn,farea,fileName)))){
-    url <- paste("https://ramp0storage.blob.core.windows.net/countydata-v2/",country,"/",date,"/",fileName,".gz",sep = "")
-    download.file(url,file.path(folderIn,farea,paste(fileName,".gz",sep = "")))
-    gunzip(file.path(folderIn,farea,paste(fileName,".gz",sep = "")))
-  }
+  url <- paste("https://ramp0storage.blob.core.windows.net/countydata-v2/",country,"/",date,"/",fileName,".gz",sep = "")
+  download.file(url,file.path(folderIn,farea,paste(fileName,".gz",sep = "")))
+  gunzip(file.path(folderIn,farea,paste(fileName,".gz",sep = "")))
   res <- read.csv(file.path(folderIn,farea,fileName))
   return(res)
 }
 
-# Test areas
 dataWY <- loadArea("west-yorkshire",2020)
 dataL <- loadArea("greater-london",2020)
 dataR <- loadArea("rutland",2020)
 dataC <- loadArea("cheshire",2020)
+```
 
+## Algorithm 1: Cluster within synthetic data
 
-##########################################################
-##########################################################
-####### Algorithm 1: Cluster within synthetic data #######
-##########################################################
-##########################################################
+### Moment-based approach
 
-
-#####
-##### Moment-based approach
-#####
-
-# Extract first four moments for one distribution as vector
+Functions to extract moments of a variable from a `countydata-v2` file.
+```{r}
 findmoments <- function(dstrb){
   step <- descdist(dstrb, discrete = FALSE)
   return(c(step$mean,step$sd,step$skewness,step$kurtosis))
 }
 
-# Extract first four moments for geographic area at a specific scale
 moments <- function(var,data,scale = c("All","OA11CD","LSOA11CD","MSOA11CD","LAD20CD"),lu){
   varN <- which(colnames(data) == var)
   scale <- match.arg(scale)
@@ -90,46 +89,34 @@ moments <- function(var,data,scale = c("All","OA11CD","LSOA11CD","MSOA11CD","LAD
   }
   return(res)
 }
+```
 
-# Create heatmap
+Create a heatmap adjusted to the data
+```{r}
 hmap <- function(data,title){
+  dev.off()
   data2 <- data[,2:5]
   rownames(data2) <- data[,1]
   heatmap(t(as.matrix(data2)),margins =c(10,0),main = title,Rowv = NA)
 }
+```
 
-## Tests
+#### Tests
 
 # Age / MSOA
+```
 testR <- moments("age",dataR,scale = "MSOA11CD",lu)
 testWY <- moments("age",dataWY,scale = "MSOA11CD",lu)
 testL <- moments("age",dataL,scale = "MSOA11CD",lu)
 testC <- moments("age",dataC,scale = "MSOA11CD",lu)
-
-png(file=file.path(folderOut,fplot,"Age_Rutland_MSOA.png"), width=700, height=500)
+```
+Results
+```{r}
 hmap(testR,"Rutland - Age")
-dev.off()
-png(file=file.path(folderOut,fplot,"Age_WY_MSOA.png"), width=700, height=500)
 hmap(testWY,"West Yorkshire - Age")
-dev.off()
-png(file=file.path(folderOut,fplot,"Age_London_MSOA.png"), width=700, height=500)
 hmap(testL,"London - Age")
-dev.off()
-png(file=file.path(folderOut,fplot,"Age_Cheshire_MSOA.png"), width=700, height=500)
 hmap(testC,"Cheshire - Age")
-dev.off()
-
-# Distributions for some MSOAS in London
-
-age1 <- dataL$age[grep("E02000593",dataL$pid)]
-age2 <- dataL$age[grep("E02000358",dataL$pid)]
-age3 <- dataL$age[grep("E02000668",dataL$pid)]
-
-png(file=file.path(folderOut,fplot,"Comparison_different_clusters.png"), width=700, height=500)
-hist(age2, main = "Age: E02000358 grey, E02000593 red, E02000668 green")
-hist(age1,col = alpha(2,0.5), add = T)
-hist(age3,col = alpha(3,0.5), add = T)
-dev.off()
+```
 
 # Age / Entire county
 testR2 <- moments("age",dataR,scale = "All",lu)
@@ -139,9 +126,7 @@ testC2 <- moments("age",dataC,scale = "All",lu)
 
 all <- rbind(testR2,testWY2,testL2,testC2)
 all$area <- c("Rutland","West_Yorkshire","London","Cheshire")
-png(file=file.path(folderOut,fplot,"Age_Counties.png"), width=700, height=500)
 hmap(all,"Counties")
-dev.off()
 
 # Salary / MSOA
 dataRnotNA <- dataR[!is.na(dataR$incomeH),]
@@ -151,12 +136,8 @@ testWYSal <- moments("incomeH",dataWYnotNA,scale = "MSOA11CD",lu)
 #testLSal <- moments("incomeH",dataL,scale = "MSOA11CD",lu)
 #testCSal <- moments("incomeH",dataC,scale = "MSOA11CD",lu)
 
-png(file=file.path(folderOut,fplot,"Salary_Rutland_MSOA.png"), width=700, height=500)
 hmap(testRSal,"Rutland - Salary")
-dev.off()
-png(file=file.path(folderOut,fplot,"Salary_WY_MSOA.png"), width=700, height=500)
 hmap(testWYSal,"West Yorkshire - Salary")
-dev.off()
 #hmap(testLSal,"London - Salary")
 #hmap(testCSal,"Cheshire - Salary")
 
@@ -169,9 +150,9 @@ test <- dataWY$age
 
 # 1. using fitDistPred
 
-system.time(res1 <- fitDistPred(test, k = 2, type = "realplus", trace = FALSE, rand = rand, try.gamlss = TRUE)) # minimum prediction global deviance.
-system.time(res2 <- fitDistPred(dataR$age, k = 2, type = "realplus", trace = FALSE, rand = rand, try.gamlss = TRUE))
-system.time(res3 <- fitDistPred(dataC$age, k = 2, type = "realplus", trace = FALSE, rand = rand, try.gamlss = TRUE))
+res1 <- fitDistPred(test, k = 2, type = "realplus", trace = FALSE, rand = rand, try.gamlss = TRUE) # minimum prediction global deviance.
+res2 <- fitDistPred(dataR$age, k = 2, type = "realplus", trace = FALSE, rand = rand, try.gamlss = TRUE)
+res3 <- fitDistPred(dataC$age, k = 2, type = "realplus", trace = FALSE, rand = rand, try.gamlss = TRUE)
 
 res1bis <- res1$fits[order(names(res1$fits))]
 res2bis <- res2$fits[order(names(res2$fits))]
@@ -188,17 +169,10 @@ cor(res3bis,res2bis,use = "pairwise.complete.obs")
 
 testDF <- data.frame(y = dataR$age, x = 1)
 resCD <- gamlss(y~1, family=NO, data=testDF)
-system.time(t2 <- chooseDist(resCD, type="realline", parallel="snow", ncpus=4))
+t2 <- chooseDist(resCD, type="realline", parallel="snow", ncpus=4)
 t2
 
-#getOrder(t2,3)
 
+## Algorithm 2: Compare to real data
 
-#################################################
-#################################################
-####### Algorithm 2: Compare to real data #######
-#################################################
-#################################################
-
-# /!\ /!\ /!\ try SDMetrics 
-
+This will use metrics between distributions inspired by SDMetrics.
