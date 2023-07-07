@@ -42,6 +42,7 @@ loadArea <- function(name,date,country = "England"){
 # Test areas
 dataWY <- loadArea("west-yorkshire",2020)
 dataL <- loadArea("greater-london",2020)
+dataL$MSOA11CD <- substr(dataL$pid,1,9)
 dataR <- loadArea("rutland",2020)
 dataC <- loadArea("cheshire",2020)
 
@@ -130,6 +131,87 @@ hist(age2, main = "Age: E02000358 grey, E02000593 red, E02000668 green")
 hist(age1,col = alpha(2,0.5), add = T)
 hist(age3,col = alpha(3,0.5), add = T)
 dev.off()
+
+
+#### More serious clustering
+
+# Explicit from above
+x <- testL[,2:5]
+dx <- dist(x)
+hmapL <- hclust(dx)
+plot(hmapL)
+
+# Normalised clustering
+xp <- testL[1:5]
+xp$mean <- xp$mean/max(xp$mean)
+xp$sd <- xp$sd/max(xp$sd)
+xp$skewness <- xp$skewness/max(xp$skewness)
+xp$kurtosis <- xp$kurtosis/max(xp$kurtosis)
+xpp <- xp
+xp <- testL[2:5]
+rownames(xp) <- testL$area
+dxp <- dist(xp)
+
+hmapLp <- hclust(dxp)
+plot(hmapLp)
+
+png(file=file.path(folderOut,fplot,"clusters/Age_normalised_London_MSOA.png"), width=700, height=500)
+hmap(xpp,"London - Age (norm.)")
+dev.off()
+
+# Get first 4 clusters
+temp <- cutree(hmapLp, k = 4)
+c1 <- names(temp[which(temp == 1)])
+c2 <- names(temp[which(temp == 2)])
+c3 <- names(temp[which(temp == 3)])
+c4 <- names(temp[which(temp == 4)])
+
+# Histogram for each cluster
+age1 <- dataL$age[dataL$MSOA11CD %in% c1]
+age2 <- dataL$age[dataL$MSOA11CD %in% c2]
+age3 <- dataL$age[dataL$MSOA11CD %in% c3]
+age4 <- dataL$age[dataL$MSOA11CD %in% c4]
+
+# Not normalised
+png(file=file.path(folderOut,fplot,"clusters/Full_clusters_counts.png"), width=700, height=500)
+hist(age2, main = "Age: Left to right {blue, red, green, grey}")
+hist(age1,col = alpha(2,0.5), add = T)
+hist(age3,col = alpha(3,0.5), add = T)
+hist(age4,col = alpha(4,0.5), add = T)
+dev.off()
+
+# Normalised
+png(file=file.path(folderOut,fplot,"clusters/Full_clusters_dens.png"), width=700, height=500)
+hist(age2, freq = F, main = "Age: Left to right {blue, red, green, grey}",ylim = c(0,0.045))
+hist(age1,col = alpha(2,0.5), freq = F, add = T)
+hist(age3,col = alpha(3,0.5), freq = F, add = T)
+hist(age4,col = alpha(4,0.5), freq = F, add = T)
+dev.off()
+
+png(file=file.path(folderOut,fplot,"clusters/Full_clusters_dens_multi.png"), width=700, height=500)
+par(mfrow = c(2, 2))
+hist(age2, freq = F, main = "Age: Left to right {blue, red, green, grey}",ylim = c(0,0.045))
+hist(age1,col = alpha(2,0.5), freq = F,ylim = c(0,0.045))
+hist(age3,col = alpha(3,0.5), freq = F,ylim = c(0,0.045))
+hist(age4,col = alpha(4,0.5), freq = F,ylim = c(0,0.045))
+dev.off()
+
+
+# Table for each cluster
+clusterCarac <- data.frame(clsuter = c("blue","red","green","grey"), mean = NA, sd = NA, skewness = NA, kurtosis = NA)
+clusterCarac[1,2:5] <- findmoments(age4)
+clusterCarac[2,2:5] <- findmoments(age1)
+clusterCarac[3,2:5] <- findmoments(age3)
+clusterCarac[4,2:5] <- findmoments(age2)
+write.table(clusterCarac,file.path(folderOut,fplot,"clusters/clusters_moments.csv"),row.names = F, sep = ",")
+
+
+
+
+hmapLp$height
+
+head(dx)
+head(dxp)
 
 # Age / Entire county
 testR2 <- moments("age",dataR,scale = "All",lu)
