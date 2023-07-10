@@ -161,10 +161,20 @@ dev.off()
 
 # Get first 4 clusters
 temp <- cutree(hmapLp, k = 4)
-c1 <- names(temp[which(temp == 1)])
-c2 <- names(temp[which(temp == 2)])
-c3 <- names(temp[which(temp == 3)])
-c4 <- names(temp[which(temp == 4)])
+cc1 <- names(temp[which(temp == 1)])
+cc2 <- names(temp[which(temp == 2)])
+cc3 <- names(temp[which(temp == 3)])
+cc4 <- names(temp[which(temp == 4)])
+# Left to right
+c(length(cc1),length(cc2),length(cc3),length(cc4))
+c1 <- cc4
+c2 <- cc1
+c3 <- cc3
+c4 <- cc2
+c(length(c1),length(c2),length(c3),length(c4))
+
+# Associated colors
+colAssoc <- c(4,2,3,"grey70")
 
 # Histogram for each cluster
 age1 <- dataL$age[dataL$MSOA11CD %in% c1]
@@ -174,26 +184,89 @@ age4 <- dataL$age[dataL$MSOA11CD %in% c4]
 
 # Not normalised
 png(file=file.path(folderOut,fplot,"clusters/Full_clusters_counts.png"), width=700, height=500)
-hist(age2, main = "Age: Left to right {blue, red, green, grey}")
-hist(age1,col = alpha(2,0.5), add = T)
-hist(age3,col = alpha(3,0.5), add = T)
-hist(age4,col = alpha(4,0.5), add = T)
+hist(age4,col = alpha(colAssoc[4],0.5) ,main = "Age counts: Left cluster to right cluster {blue, red, green, grey}",xlab = "Age")
+hist(age1,col = alpha(colAssoc[1],0.5), add = T)
+hist(age2,col = alpha(colAssoc[2],0.5), add = T)
+hist(age3,col = alpha(colAssoc[3],0.5), add = T)
 dev.off()
 
 # Normalised
 png(file=file.path(folderOut,fplot,"clusters/Full_clusters_dens.png"), width=700, height=500)
-hist(age2, freq = F, main = "Age: Left to right {blue, red, green, grey}",ylim = c(0,0.045))
-hist(age1,col = alpha(2,0.5), freq = F, add = T)
-hist(age3,col = alpha(3,0.5), freq = F, add = T)
-hist(age4,col = alpha(4,0.5), freq = F, add = T)
+hist(age2,col = alpha(colAssoc[2],0.5), freq = F, main = "Age density: Left cluster to right cluster {blue, red, green, grey}",ylim = c(0,0.045),xlab = "Age")
+hist(age4,col = alpha(colAssoc[4],0.5), freq = F, add = T)
+hist(age3,col = alpha(colAssoc[3],0.5), freq = F, add = T)
+hist(age1,col = alpha(colAssoc[1],0.5), freq = F, add = T)
 dev.off()
 
 png(file=file.path(folderOut,fplot,"clusters/Full_clusters_dens_multi.png"), width=700, height=500)
 par(mfrow = c(2, 2))
-hist(age2, freq = F, main = "Age: Left to right {blue, red, green, grey}",ylim = c(0,0.045))
-hist(age1,col = alpha(2,0.5), freq = F,ylim = c(0,0.045))
-hist(age3,col = alpha(3,0.5), freq = F,ylim = c(0,0.045))
-hist(age4,col = alpha(4,0.5), freq = F,ylim = c(0,0.045))
+hist(age1,col = alpha(colAssoc[1],0.5), freq = F, main = "Age: Left most cluster",ylim = c(0,0.045),xlab = "Age")
+hist(age3,col = alpha(colAssoc[3],0.5), freq = F, main = "Age: Middle right cluster",ylim = c(0,0.045),xlab = "Age")
+hist(age2,col = alpha(colAssoc[2],0.5), freq = F, main = "Age: Middle left cluster",ylim = c(0,0.045),xlab = "Age")
+hist(age4,col = alpha(colAssoc[4],0.5), freq = F, main = "Age: Right most cluster",ylim = c(0,0.045),xlab = "Age")
+dev.off()
+
+##### All curves
+
+# c is a specific cluster, data is the original data, skip retains 1 curve every [skip + 1] curves, breaks for hist()
+curveFromCluster <- function(c,data,skip,breaks  = seq(0,90,5)){
+  l <- floor(length(c)/(skip + 1))
+  msoas <- data$MSOA11CD
+  ages <- data$age
+  M1 <- matrix(NA,nrow = l, ncol = length(breaks) - 1)
+  M2 <- matrix(NA,nrow = l, ncol = length(breaks) - 1)
+  for(i in 1:l){
+    j <- min(1 + (skip + 1) * (i - 1), length(c))
+    age <- dataL$age[dataL$MSOA11CD %in% c[j]]
+    h <- hist(age, breaks, plot = F)
+    M1[i,] <- h$density
+    M2[i,] <- h$mids
+  }
+  return(list(M1,M2))
+}
+
+plotFromCluster <- function(obj,height, col = 1){
+  x <- obj[[2]]
+  y <- obj[[1]]
+  if(height == "find"){
+    h <- max(y) * 1.1
+  }else {
+    h <- height
+  }
+  plot(x[1,],y[1,],ylim = c(0,h), pch = NA,xlab = "Age",ylab = "Density")
+  for(i in 1:nrow(x)){
+    lines(x[i,],y[i,],col = alpha(col, 0.5))
+  }
+}
+
+c(length(c1),length(c2),length(c3),length(c4))
+res1 <- curveFromCluster(c1,dataL,0)
+res2 <- curveFromCluster(c2,dataL,3)
+res3 <- curveFromCluster(c3,dataL,1)
+res4 <- curveFromCluster(c4,dataL,6)
+
+png(file=file.path(folderOut,fplot,"clusters/Curves_clusters_dens_multi.png"), width=700, height=500)
+par(mfrow = c(2, 2))
+plotFromCluster(res1,"find",colAssoc[1])
+title("Age: Left most cluster")
+plotFromCluster(res3,"find",colAssoc[3])
+title("Age: Middle right cluster")
+plotFromCluster(res2,"find",colAssoc[2])
+title("Age: Middle left cluster")
+plotFromCluster(res4,"find",colAssoc[4])
+title("Age: Right most cluster")
+dev.off()
+
+png(file=file.path(folderOut,fplot,"clusters/Curves_clusters_dens_multi_same_scale.png"), width=700, height=500)
+par(mfrow = c(2, 2))
+plotFromCluster(res1,0.055,colAssoc[1])
+title("Age: Left most cluster")
+plotFromCluster(res3,0.055,colAssoc[3])
+title("Age: Middle right cluster")
+plotFromCluster(res2,0.055,colAssoc[2])
+title("Age: Middle left cluster")
+plotFromCluster(res4,0.055,colAssoc[4])
+title("Age: Right most cluster")
 dev.off()
 
 
