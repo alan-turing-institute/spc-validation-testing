@@ -2,13 +2,34 @@
 ### Label clustering. Possible labels:
 #     - [ ] Centrality measures within transportation network
 #     - [ ] “Geographic centrality” aka distance from highest density areas
-#     - [ ] Density
-#     - [ ] Age; ethnicity?
+#     - [ ] Population density (better than categorical rural urban -- see def pb and World Pop 1000 inh./sqkm)
+#     - [ ] Age; ethnicity? (<- also pb is categorical; maybe keep numerical initially)
 #     - [ ] Index of deprivation
 #     - [ ] Life satisfaction?
+#
+# SUPPORTED MODELS: stats::lm; stats::glm; ranger::ranger; mgcv::gam; xgboost::xgb.train
+# Custom model possible, but implementation looks wonky
+
+# Note: categorical supported (see full doc online: https://cran.r-project.org/web/packages/shapr/vignettes/understanding_shapr.html), but more restrictive
+# Also, no NA
+
+## For initial analysis, let's compute for each MSOA:
+#   - NUM: Closeness centrality from ONS OD matrix (Azure)
+#   - NUM: Betweenness centrality from ONS OD matrix (Azure)
+#   - NUM: Distance from nearest local high density area (?)
+#   - NUM: Population density (Compute from Shp)
+#   - NUM: Median age (Compute from SPC - Azure)
+#   - NUM: Index of deprivation (2019; https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019)
+#
+# MODEL: xgboost (Ref: https://xgboost.readthedocs.io/en/stable/tutorials/model.html)
+
+## Define:
+#   - "Local high density area"
+
 
 ### METHODS:
 #     - SHAP <- Prob best?
+#             Four approaches: "empirical" (default), "gaussian", "copula", or "ctree" (gausian and copula require gaussian assumptions; only ctree for cat var; no independence assumption vs original kernel approach).
 #     - LIME <- Similar, less theoretically sound (supposedly)
 #     - TREPAN? (model specific)
 
@@ -69,6 +90,44 @@ print(explanation$dt)
 
 # Plot the resulting explanations for observations 1 and 6
 plot(explanation, plot_phi0 = FALSE, index_x_test = c(1, 6))
+
+# Use the Gaussian approach
+explanation_gaussian <- explain(
+  x_test,
+  approach = "gaussian",
+  explainer = explainer,
+  prediction_zero = p
+)
+
+# Plot the resulting explanations for observations 1 and 6
+plot(explanation_gaussian, plot_phi0 = FALSE, index_x_test = c(1, 6))
+
+# Use the Gaussian copula approach
+explanation_copula <- explain(
+  x_test,
+  approach = "copula",
+  explainer = explainer,
+  prediction_zero = p
+)
+
+# Plot the resulting explanations for observations 1 and 6, excluding
+# the no-covariate effect
+plot(explanation_copula, plot_phi0 = FALSE, index_x_test = c(1, 6))
+
+# Use the conditional inference tree approach
+explanation_ctree <- explain(
+  x_test,
+  approach = "ctree",
+  explainer = explainer,
+  prediction_zero = p
+)
+
+# Plot the resulting explanations for observations 1 and 6, excluding 
+# the no-covariate effect
+plot(explanation_ctree, plot_phi0 = FALSE, index_x_test = c(1, 6))
+
+
+###
 
 
 #######
