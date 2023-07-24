@@ -34,6 +34,154 @@
 #     - TREPAN? (model specific)
 
 
+#########################
+#########################
+####### Test data #######
+#########################
+#########################
+
+
+library(igraph)
+library(readxl)
+library(geojsonR)
+library(geosphere)
+
+# We use West Yorshire as a test area
+MSOAs_WY <- unique(lu$MSOA11CD[lu$AzureRef == "west-yorkshire"])
+
+labels_WY <- data.frame(MSOA11CD = MSOAs_WY, closeness = NA, betweenness = NA, distHPD = NA,
+                        popDens = NA, medAge = NA, deprivation = NA)
+
+### OD matrix from Azure -> closeness and betweenness
+download.file(url = "https://ramp0storage.blob.core.windows.net/nationaldata/commutingOD.gz", destfile = file.path(folderIn,fdl,"commutingOD.csv.gz"))
+gunzip(file.path(folderIn,fdl,"commutingOD.csv.gz"))
+OD <- read.csv(file.path(folderIn,fdl,"commutingOD.csv"), header = T)
+
+OD_wide <- pivot_wider(OD, names_from = HomeMSOA, values_from = Total_Flow)
+OD_wide <- as.matrix(OD_wide)
+OD_wide_prep <- OD_wide[,2:ncol(OD_wide)]
+rownames(OD_wide_prep) <- OD_wide[,1]
+
+ncol(OD_wide_prep)
+nrow(OD_wide_prep)
+
+M <- matrix(0:8,ncol = 3, nrow = 3)
+M_net <- graph_from_adjacency_matrix(M, mode = "directed", weighted = TRUE, diag = TRUE)
+plot(M_net)
+
+OD_net <- graph_from_adjacency_matrix(OD_wide_prep, mode = "directed", weighted = TRUE, diag = TRUE)
+
+plot(OD_net)
+dev.off()
+
+get.edgelist(OD_net)
+
+e(OD_net)
+
+test <- betweenness(OD_net,directed = TRUE, normalized = TRUE)
+#test <- betweenness(OD_net,directed = TRUE, weights = , normalized = TRUE)
+between_WY <- test[which(names(test) %in% MSOAs_WY)]
+
+range(between_WY * 100000)
+
+# Arbitrary normalisation so that it looks nice
+for(i in 1:nrow(labels_WY)){
+  labels_WY$betweenness[i] <- between_WY[names(between_WY) == labels_WY$MSOA11CD[i]] * 100000
+}
+
+
+test <- closeness(OD_net, mode = "all", normalized = TRUE)
+close_WY <- test[which(names(test) %in% MSOAs_WY)]
+
+range(close_WY * 10)
+
+for(i in 1:nrow(labels_WY)){
+  labels_WY$closeness[i] <- close_WY[names(close_WY) == labels_WY$MSOA11CD[i]] * 10
+}
+
+
+### SPC output -> Median age
+
+i = 1 
+for(i in 1:nrow(labels_WY)){
+  labels_WY$medAge[i] <- median(dataWY$age[dataWY$MSOA11CD == labels_WY$MSOA11CD[i]])
+}
+
+### Shapefile -> pop density and distance to nearest highest density area
+download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/MSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"))
+msoa_js <- FROM_GeoJson(url_file_string = file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"))
+
+msoa_feat <- msoa_js$features
+msoa_pop <- rep(NA,length(msoa_feat))
+msoa_names <- rep(NA,length(msoa_feat))
+msoa_areas <- rep(NA,length(msoa_feat))
+for(i in 1:length(msoa_feat)){
+  msoa_pop[i] <- msoa_feat[[i]]$properties$PopCount
+  msoa_names[i] <- msoa_feat[[i]]$properties$MSOA11CD
+  msoa_areas[i] <- msoa_feat[[i]]$properties$Shape_Area
+}
+msoa_areas <- msoa_areas / 1000000
+
+for(i in 1:nrow(labels_WY)){
+  labels_WY$popDens[i] <- msoa_pop[msoa_names == labels_WY$MSOA11CD[i]] / msoa_areas[msoa_names == labels_WY$MSOA11CD[i]] 
+}
+
+max(labels_WY$popDens)
+sort(labels_WY$popDens, decr = T)
+
+which.max(labels_WY$popDens)
+
+# For now, strictly distance to highest dens area <--- CHANGE TO SOMETHING MORE FINE !!!!
+# PB: WEIRD INABILITY TO OPEN GEOJSON WITH OGR, USING AVERAGE CENTROID FROM OA INSTEAD
+
+x_ref <- mean(dataWY$lng[dataWY$MSOA11CD == labels_WY$MSOA11CD[which.max(labels_WY$popDens)]])
+y_ref <- mean(dataWY$lat[dataWY$MSOA11CD == labels_WY$MSOA11CD[which.max(labels_WY$popDens)]])
+for(i in 1:nrow(labels_WY)){
+  x <- mean(dataWY$lng[dataWY$MSOA11CD == labels_WY$MSOA11CD[i]])
+  y <- mean(dataWY$lat[dataWY$MSOA11CD == labels_WY$MSOA11CD[i]])
+  labels_WY$distHPD[i] <- distHaversine(c(x_ref,y_ref),c(x,y))
+}
+
+
+### Index of deprivation (pop weighted average rank <---- FIND BETTER !!?!)
+
+# Download from gov.uk
+
+url <- "https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/833970/File_1_-_IMD2019_Index_of_Multiple_Deprivation.xlsx"
+download.file(url = url, destfile = file.path(folderIn,fdl,"deprivation.xlsx"))
+
+# Pop for weighted average
+download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/LSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
+lsoa_js <- FROM_GeoJson(url_file_string = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
+
+lsoa_feat <- lsoa_js$features
+lsoa_pop <- rep(NA,length(lsoa_feat))
+lsoa_names <- rep(NA,length(lsoa_feat))
+for(i in 1:length(lsoa_feat)){
+  lsoa_pop[i] <- lsoa_feat[[i]]$properties$Pop20
+  lsoa_names[i] <- lsoa_feat[[i]]$properties$LSOA11CD
+}
+
+depriv <- read_excel(file.path(folderIn,fdl,"deprivation.xlsx"), sheet = 2)
+
+for(i in 1:nrow(labels_WY)){
+  msoa <- labels_WY$MSOA11CD[i]
+  lsoas <- unique(lu$LSOA11CD[lu$MSOA11CD == msoa])
+  pops <- rep(NA, length(lsoas))
+  deprivs <- rep(NA,length(lsoas))
+  for(j in 1:length(lsoas)){
+    deprivs[j] <- depriv$`Index of Multiple Deprivation (IMD) Rank`[depriv$`LSOA code (2011)` == lsoas[j]]
+    pops[j] <- lsoa_pop[lsoa_names == lsoas[j]]
+  }
+  labels_WY$deprivation[i] <- sum(deprivs * pops) / sum(pops)
+}
+
+i = 1
+j = 1
+
+
+write.table(labels_WY,file.path(folderIn,"labels_WY.csv"),sep = ",")
+
 ####################
 ####################
 ####### SHAP #######

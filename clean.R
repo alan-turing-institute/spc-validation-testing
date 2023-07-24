@@ -2,6 +2,7 @@ library(gamlss)
 library(fitdistrplus)
 library(R.utils)
 library(scales)
+library(tidyr)
 #library(ggplot2)
 
 folderIn <- "Data"
@@ -41,6 +42,7 @@ loadArea <- function(name,date,country = "England"){
 
 # Test areas
 dataWY <- loadArea("west-yorkshire",2020)
+dataWY$MSOA11CD <- substr(dataWY$pid,1,9)
 dataL <- loadArea("greater-london",2020)
 dataL$MSOA11CD <- substr(dataL$pid,1,9)
 dataR <- loadArea("rutland",2020)
