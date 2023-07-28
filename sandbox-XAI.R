@@ -180,7 +180,8 @@ i = 1
 j = 1
 
 
-write.table(labels_WY,file.path(folderIn,"labels_WY.csv"),sep = ",")
+write.table(labels_WY,file.path(folderIn,"labels_WY.csv"),sep = ",",row.names = F)
+
 
 ####################
 ####################
@@ -279,5 +280,121 @@ plot(explanation_ctree, plot_phi0 = FALSE, index_x_test = c(1, 6))
 
 
 #######
+####### Test of SHAP on WY data
 #######
-#######
+
+
+# Predictors
+labels_WY
+
+# Predictions
+testWY_sal <- moments("incomeH",dataWYnotNA,scale = "MSOA11CD",lu)
+
+# Check MSOAs are ordered properlyt
+labels_WY$MSOA11CD == testWY$area
+
+# Training set
+x_train <- as.matrix(labels_WY[-1:-20,2:7])
+
+# Results: Order 1-4: mean, sd, skewness, kurtosis
+y_train_1 <- testWY_sal[-1:-20, "mean"]
+y_train_2 <- testWY_sal[-1:-20, "sd"]
+y_train_3 <- testWY_sal[-1:-20, "skewness"]
+y_train_4 <- testWY_sal[-1:-20, "kurtosis"]
+
+# Test set
+x_test <- as.matrix(labels_WY[1:20, 2:7])
+
+### Mean
+
+# Fitting a basic xgboost model to the training data
+model <- xgboost(
+  data = x_train,
+  label = y_train_1,
+  nround = 20,
+  verbose = FALSE
+)
+# Explanation
+explainer <- shapr(x_train, model)
+explanation_1 <- explain(
+  x_test,
+  approach = "empirical",
+  explainer = explainer,
+  prediction_zero = mean(y_train_1)
+)
+
+###
+model <- xgboost(
+  data = x_train,
+  label = y_train_2,
+  nround = 20,
+  verbose = FALSE
+)
+# Explanation
+explainer <- shapr(x_train, model)
+explanation_2 <- explain(
+  x_test,
+  approach = "empirical",
+  explainer = explainer,
+  prediction_zero = mean(y_train_2)
+)
+
+###
+model <- xgboost(
+  data = x_train,
+  label = y_train_3,
+  nround = 20,
+  verbose = FALSE
+)
+# Explanation
+explainer <- shapr(x_train, model)
+explanation_3 <- explain(
+  x_test,
+  approach = "empirical",
+  explainer = explainer,
+  prediction_zero = mean(y_train_3)
+)
+
+###
+model <- xgboost(
+  data = x_train,
+  label = y_train_4,
+  nround = 20,
+  verbose = FALSE
+)
+# Explanation
+explainer <- shapr(x_train, model)
+explanation_4 <- explain(
+  x_test,
+  approach = "empirical",
+  explainer = explainer,
+  prediction_zero = mean(y_train_4)
+)
+
+# Printing the Shapley values for the test data.
+print(explanation_1$dt)
+
+# Plot the resulting explanations for observations 1 and 6
+plot(explanation_1, plot_phi0 = FALSE, index_x_test = c(1:4))
+
+avg1 <- colSums(abs(explanation_1$dt[,2:7]))/20
+avg2 <- colSums(abs(explanation_2$dt[,2:7]))/20
+avg3 <- colSums(abs(explanation_3$dt[,2:7]))/20
+avg4 <- colSums(abs(explanation_4$dt[,2:7]))/20
+
+res <- rbind(avg1,avg2,avg3,avg4)
+row.names(res) <- c("Mean", "Sd", "Skewness", "Kurotsis")
+res <- t(res)
+
+for(i in 1:4){
+  res[,i] <- res[,i]/max(res[,i])
+}
+
+image(1:ncol(res), 1:nrow(res), t(res), axes = FALSE, main = "West Yorshire salaries; relative importance norm. per column")
+axis(1, 1:ncol(res), colnames(res))
+axis(2, 1:nrow(res), rownames(res))
+
+image(res, axes = FALSE)
+
+
+
