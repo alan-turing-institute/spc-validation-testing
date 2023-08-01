@@ -4,7 +4,7 @@ library(geojsonR)
 library(geosphere)
 library(tidyr)
 
-## Labels for each geography:
+### Labels for each geography:
 #   - NUM: Closeness centrality from ONS OD matrix (Azure)
 #   - NUM: Betweenness centrality from ONS OD matrix (Azure)
 #   - NUM: Distance from nearest local high density area (?)
@@ -14,17 +14,25 @@ library(tidyr)
 
 ### METHODS: xgboost, SHAP
 
-#TO DO:
+### TO DO:
 #   Check def of betweenness
 #   Check def of closeness
+#   Refine distance to nearest HPD area
+
+folderIn <- "Data"
+fdl <- "dl"
+farea <- "area"
+folderOut <- "Output"
+fplot <- "plots"
+
+set.seed(18061815)
 
 
-
-#############################
-#############################
-####### Get test data #######
-#############################
-#############################
+##############################
+##############################
+####### Make test data #######
+##############################
+##############################
 
 
 downloadPrerequisites <- function(folderIn,fdl){
@@ -42,7 +50,6 @@ downloadPrerequisites <- function(folderIn,fdl){
   if(!(file.exists(file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson")))){
     download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/LSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
   }
-  
 }
 
 loadPrerequisites <- function(folderIn,fdl){
@@ -69,14 +76,31 @@ loadPrerequisites <- function(folderIn,fdl){
   assign("pop_lsoa_global", data.frame(LSOA11CD = lsoa_names, pop = lsoa_pop),  envir = globalenv())
 }
 
+# area_name and date must point to one of the .csv files on Azure
+loadArea <- function(name,date,folderIn,farea,country = "England"){
+  fileName <- paste("pop_",name,"_",date,".csv",sep = "")
+  if(!(file.exists(file.path(folderIn,farea,fileName)))){
+    url <- paste("https://ramp0storage.blob.core.windows.net/countydata-v2-1/",country,"/",date,"/",fileName,".gz",sep = "")
+    download.file(url,file.path(folderIn,farea,paste(fileName,".gz",sep = "")))
+    gunzip(file.path(folderIn,farea,paste(fileName,".gz",sep = "")))
+  }
+  res <- read.csv(file.path(folderIn,farea,fileName))
+  return(res)
+}
+
+#####🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠#####
 # For testing
 area_name = "west-yorkshire"
 scale = "LSOA11CD"
+scale = "MSOA11CD"
 scale = "LAD20CD"
+data = dataWY
+#####🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠#####
 
-# area_name must point to one of the preprocessed files on Azure
+# area_name and date must point to one of the .csv files on Azure
 # Min scale is LSOA due to source control data
-prepareLabels <- function(area_name,scale = c("LSOA11CD","MSOA11CD","LAD20CD"),median_age){
+# Taken from global environment: lu, betweenness_global, closeness_global, pop_lsoa_global
+prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD")){
   scale <- match.arg(scale)
   ref <- which(lu$AzureRef == area_name)
   lu_area <- data.frame(lu[ref,c("LSOA11CD","MSOA11CD","LAD20CD")])
@@ -115,16 +139,21 @@ prepareLabels <- function(area_name,scale = c("LSOA11CD","MSOA11CD","LAD20CD"),m
     }
   }
   # Median age
+  data <- loadArea(area_name,date)
+  median_age <- rep(NA,length(list_area))
+  for(i in 1:length(list_area)){
+    ref <- lu_area$OA11CD[lu_area[,scale] == list_area[i]]
+    median_age[i] <- median(data$age[data$OA11CD %in% ref])
+  }
   labels_area$medAge <- median_age
+  # Pop density and distace to nearest highest density area
+  
+  
+  return(labels_area)
 }
 
 
-# From global: lu, betweenness_global, closeness_global, pop_lsoa_global
 
-i = 1
-for(i in 1:nrow(labels_WY)){
-  median_age[i] <- median(dataWY$age[dataWY$MSOA11CD == labels_WY$MSOA11CD[i]])
-}
 
 ### Shapefile -> pop density and distance to nearest highest density area
 download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/MSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"))
