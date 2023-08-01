@@ -18,6 +18,7 @@ library(tidyr)
 #   Check def of betweenness
 #   Check def of closeness
 #   Refine distance to nearest HPD area
+#   Do better than deprivation rank?
 
 folderIn <- "Data"
 fdl <- "dl"
@@ -36,20 +37,35 @@ set.seed(18061815)
 
 
 downloadPrerequisites <- function(folderIn,fdl){
+  n <- 0
   # LookUp table
   if(!(file.exists(file.path(folderIn,fdl,"lookUp-GB.csv")))){
+    print("Downloading look-up...")
     download.file("https://ramp0storage.blob.core.windows.net/referencedata/lookUp-GB.csv.gz",file.path(folderIn,fdl,"lookUp-GB.csv.gz"))
     gunzip(file.path(folderIn,fdl,"lookUp-GB.csv.gz"))
+    n <- n+1
   }
   # OD matrix
   if(!(file.exists(file.path(folderIn,fdl,"commutingOD.csv")))){
+    print("Downloading commuting matrix...")
     download.file(url = "https://ramp0storage.blob.core.windows.net/nationaldata/commutingOD.gz", destfile = file.path(folderIn,fdl,"commutingOD.csv.gz"))
     gunzip(file.path(folderIn,fdl,"commutingOD.csv.gz"))
+    n <- n+1
   }
   # Pop at LSOA scale
   if(!(file.exists(file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson")))){
+    print("Downloading geojson at LSOA scale...")
     download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/LSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
+    n <- n+1
   }
+  # Deprivation ranks
+  if(!(file.exists(file.path(folderIn,fdl,"deprivation.xlsx")))){
+    print("Downloading deprivation ranks from gov.uk...")
+    url <- "https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/833970/File_1_-_IMD2019_Index_of_Multiple_Deprivation.xlsx"
+    download.file(url = url, destfile = file.path(folderIn,fdl,"deprivation.xlsx"))
+    n <- n+1
+  }
+  print(paste("Downloaded", n, "new files, skipped", 4-n, "files that already exists", sep = " "))
 }
 
 loadPrerequisites <- function(folderIn,fdl){
@@ -62,18 +78,28 @@ loadPrerequisites <- function(folderIn,fdl){
   OD_wide_prep <- OD_wide[,2:ncol(OD_wide)]
   rownames(OD_wide_prep) <- OD_wide[,1]
   OD_net <- graph_from_adjacency_matrix(OD_wide_prep, mode = "directed", weighted = TRUE, diag = TRUE)
-  assign("betweenness_global", betweenness(OD_net,directed = TRUE, normalized = TRUE),  envir = globalenv())
-  assign("closeness_global", closeness(OD_net, mode = "all", normalized = TRUE),  envir = globalenv())
+  print("Calculating betweenness centrality, this can take several minutes...")
+  assign("betweenness_global", betweenness(OD_net,directed = TRUE, normalized = TRUE), envir = globalenv())
+  print("Calculating closeness centrality, this can take several minutes...")
+  assign("closeness_global", closeness(OD_net, mode = "all", normalized = TRUE), envir = globalenv())
   # LSOA pop
+  print("Loading the heavy geojson file...")
   lsoa_js <- FROM_GeoJson(url_file_string = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
+  print("Almost done...")
   lsoa_feat <- lsoa_js$features
   lsoa_pop <- rep(NA,length(lsoa_feat))
   lsoa_names <- rep(NA,length(lsoa_feat))
+  lsoa_areas <- rep(NA,length(lsoa_feat))
   for(i in 1:length(lsoa_feat)){
     lsoa_pop[i] <- lsoa_feat[[i]]$properties$Pop20
     lsoa_names[i] <- lsoa_feat[[i]]$properties$LSOA11CD
+    lsoa_areas[i] <- lsoa_feat[[i]]$properties$Shape_Area
   }
-  assign("pop_lsoa_global", data.frame(LSOA11CD = lsoa_names, pop = lsoa_pop),  envir = globalenv())
+  lsoa_areas <- lsoa_areas / 1000000
+  assign("popArea_lsoa_global", data.frame(LSOA11CD = lsoa_names, pop = lsoa_pop, area = lsoa_areas), envir = globalenv())
+  # Deprivation index
+  assign("depriv_global", read_excel(file.path(folderIn,fdl,"deprivation.xlsx"), sheet = 2), envir = globalenv())
+  print("Done! Loaded lu, betweenness_global, closeness_global, popArea_lsoa_global, depriv_global into the global environment")
 }
 
 # area_name and date must point to one of the .csv files on Azure
@@ -88,25 +114,39 @@ loadArea <- function(name,date,folderIn,farea,country = "England"){
   return(res)
 }
 
-#####🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠#####
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
 # For testing
 area_name = "west-yorkshire"
 scale = "LSOA11CD"
 scale = "MSOA11CD"
 scale = "LAD20CD"
-data = dataWY
-#####🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠#####
+date = 2020
+#data = dataWY
+dataS <- data
+#data <- dataS
+i = 1
+
+colnames(data)
+head(data)
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
 
 # area_name and date must point to one of the .csv files on Azure
 # Min scale is LSOA due to source control data
-# Taken from global environment: lu, betweenness_global, closeness_global, pop_lsoa_global
-prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD")){
+# Taken from global environment: ,folderIn, farea, lu, betweenness_global, closeness_global, popArea_lsoa_global, depriv_global
+prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), data = NULL){
+  # Load and trim Azure file (needed for median age)
+  if(is.null(data)){
+    data <- loadArea(area_name,date,folderIn,farea)
+  }
+  data <- data[,c("OA11CD","pid","age","lng","lat")]
+  data <- merge(data,lu[,c("OA11CD","LSOA11CD","MSOA11CD","LAD20CD")], by.x = "OA11CD", by.y = "OA11CD", all.x = T)
+  # Prepare look-up with pop and areas + list of areas at chosen scale
   scale <- match.arg(scale)
-  ref <- which(lu$AzureRef == area_name)
-  lu_area <- data.frame(lu[ref,c("LSOA11CD","MSOA11CD","LAD20CD")])
+  lu_area <- data.frame(lu[which(lu$AzureRef == area_name),c("LSOA11CD","MSOA11CD","LAD20CD")])
   lu_area <- lu_area[!duplicated(lu_area),]
-  lu_area <- merge(lu_area, pop_lsoa_global, by.x = "LSOA11CD", by.y = "LSOA11CD", all.x = T)
+  lu_area <- merge(lu_area, popArea_lsoa_global, by.x = "LSOA11CD", by.y = "LSOA11CD", all.x = T)
   list_area <- unique(lu_area[,scale])
+  #
   labels_area <- data.frame(area = list_area, closeness = NA, betweenness = NA, distHPD = NA,
                           popDens = NA, medAge = NA, deprivation = NA)
   colnames(labels_area)[1] <- scale
@@ -130,7 +170,7 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
       clos <- rep(NA,length(ref))
       pops <- rep(NA,length(ref))
       for(j in 1:length(ref)){
-        betw[j] <- betweenness_global[names(betweenness_global) == ref[j]] * 10000
+        betw[j] <- betweenness_global[names(betweenness_global) == ref[j]] * 100000
         clos[j] <- closeness_global[names(closeness_global) == ref[j]] * 10
         pops[j] <- sum(lu_area$pop[lu_area$MSOA11CD == ref[j]])
       }
@@ -139,96 +179,64 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
     }
   }
   # Median age
-  data <- loadArea(area_name,date)
-  median_age <- rep(NA,length(list_area))
   for(i in 1:length(list_area)){
-    ref <- lu_area$OA11CD[lu_area[,scale] == list_area[i]]
-    median_age[i] <- median(data$age[data$OA11CD %in% ref])
+    labels_area$medAge[i] <- median(data$age[data[,scale] == list_area[i]])
   }
-  labels_area$medAge <- median_age
-  # Pop density and distace to nearest highest density area
-  
-  
+  # Pop density and distance to nearest highest density area
+  for(i in 1:length(list_area)){
+    ref <- lu_area$LSOA11CD[lu_area[,scale] == list_area[i]]
+    labels_area$popDens[i] <- sum(lu_area$pop[lu_area$LSOA %in% ref]) / sum(lu_area$area[lu_area$LSOA %in% ref])
+  }
+  x_ref <- mean(data$lng[data[,scale] == labels_area[which.max(labels_area$popDens),scale]])
+  y_ref <- mean(data$lat[data[,scale] == labels_area[which.max(labels_area$popDens),scale]])
+  for(i in 1:length(list_area)){
+    x <- mean(data$lng[data[,scale] == labels_area[i,scale]])
+    y <- mean(data$lat[data[,scale] == labels_area[i,scale]])
+    labels_area$distHPD[i] <- distHaversine(c(x_ref,y_ref),c(x,y))
+  }
+  # Deprivation
+  if(scale != "LSOA11CD"){
+    print("Deprivation data is at LSOA scale, using population weighted averages")
+  }
+  for(i in 1:length(list_area)){
+    lsoas <- unique(lu$LSOA11CD[lu[,scale] == list_area[i]])
+    pops <- rep(NA, length(lsoas))
+    deprivs <- rep(NA,length(lsoas))
+    for(j in 1:length(lsoas)){
+      deprivs[j] <- depriv_global$`Index of Multiple Deprivation (IMD) Rank`[depriv_global$`LSOA code (2011)` == lsoas[j]]
+      pops[j] <- lu_area$pop[lu_area$LSOA11CD == lsoas[j]]
+    }
+    labels_area$deprivation[i] <- sum(deprivs * pops) / sum(pops)
+  }
+  write.table(labels_area,file.path(folderOut,paste("labels_",area_name,"_",date,".csv",sep = "")),sep = ",",row.names = F)
+  print(paste("Done! Saved labels to",file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")),sep = " "))
   return(labels_area)
 }
 
 
 
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+downloadPrerequisites(folderIn,fdl)
+loadPrerequisites(folderIn,fdl)
 
-### Shapefile -> pop density and distance to nearest highest density area
-download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/MSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"))
-msoa_js <- FROM_GeoJson(url_file_string = file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"))
+dataWY <- loadArea("west-yorkshire",2020,folderIn,farea)
 
-msoa_feat <- msoa_js$features
-msoa_pop <- rep(NA,length(msoa_feat))
-msoa_names <- rep(NA,length(msoa_feat))
-msoa_areas <- rep(NA,length(msoa_feat))
-for(i in 1:length(msoa_feat)){
-  msoa_pop[i] <- msoa_feat[[i]]$properties$PopCount
-  msoa_names[i] <- msoa_feat[[i]]$properties$MSOA11CD
-  msoa_areas[i] <- msoa_feat[[i]]$properties$Shape_Area
-}
-msoa_areas <- msoa_areas / 1000000
-
-for(i in 1:nrow(labels_WY)){
-  labels_WY$popDens[i] <- msoa_pop[msoa_names == labels_WY$MSOA11CD[i]] / msoa_areas[msoa_names == labels_WY$MSOA11CD[i]] 
-}
-
-max(labels_WY$popDens)
-sort(labels_WY$popDens, decr = T)
-
-which.max(labels_WY$popDens)
-
-# For now, strictly distance to highest dens area <--- CHANGE TO SOMETHING MORE FINE !!!!
-# PB: WEIRD INABILITY TO OPEN GEOJSON WITH OGR, USING AVERAGE CENTROID FROM OA INSTEAD
-
-x_ref <- mean(dataWY$lng[dataWY$MSOA11CD == labels_WY$MSOA11CD[which.max(labels_WY$popDens)]])
-y_ref <- mean(dataWY$lat[dataWY$MSOA11CD == labels_WY$MSOA11CD[which.max(labels_WY$popDens)]])
-for(i in 1:nrow(labels_WY)){
-  x <- mean(dataWY$lng[dataWY$MSOA11CD == labels_WY$MSOA11CD[i]])
-  y <- mean(dataWY$lat[dataWY$MSOA11CD == labels_WY$MSOA11CD[i]])
-  labels_WY$distHPD[i] <- distHaversine(c(x_ref,y_ref),c(x,y))
-}
+test <- prepareLabels("west-yorkshire", 2020, scale = "LSOA11CD", data = NULL)
+test <- prepareLabels("west-yorkshire", 2020, scale = "MSOA11CD", data = NULL)
+test <- prepareLabels("west-yorkshire", 2020, scale = "LAD20CD", data = NULL)
+test <- prepareLabels("west-yorkshire", 2020, scale = "LSOA11CD", data = dataWY)
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
 
 
-### Index of deprivation (pop weighted average rank <---- FIND BETTER !!?!)
-
-# Download from gov.uk
-
-url <- "https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/833970/File_1_-_IMD2019_Index_of_Multiple_Deprivation.xlsx"
-download.file(url = url, destfile = file.path(folderIn,fdl,"deprivation.xlsx"))
-
-# Pop for weighted average
-download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/LSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
-lsoa_js <- FROM_GeoJson(url_file_string = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
-
-lsoa_feat <- lsoa_js$features
-lsoa_pop <- rep(NA,length(lsoa_feat))
-lsoa_names <- rep(NA,length(lsoa_feat))
-for(i in 1:length(lsoa_feat)){
-  lsoa_pop[i] <- lsoa_feat[[i]]$properties$Pop20
-  lsoa_names[i] <- lsoa_feat[[i]]$properties$LSOA11CD
-}
-
-depriv <- read_excel(file.path(folderIn,fdl,"deprivation.xlsx"), sheet = 2)
-
-for(i in 1:nrow(labels_WY)){
-  msoa <- labels_WY$MSOA11CD[i]
-  lsoas <- unique(lu$LSOA11CD[lu$MSOA11CD == msoa])
-  pops <- rep(NA, length(lsoas))
-  deprivs <- rep(NA,length(lsoas))
-  for(j in 1:length(lsoas)){
-    deprivs[j] <- depriv$`Index of Multiple Deprivation (IMD) Rank`[depriv$`LSOA code (2011)` == lsoas[j]]
-    pops[j] <- lsoa_pop[lsoa_names == lsoas[j]]
-  }
-  labels_WY$deprivation[i] <- sum(deprivs * pops) / sum(pops)
-}
-
-i = 1
-j = 1
 
 
-write.table(labels_WY,file.path(folderIn,"labels_WY.csv"),sep = ",",row.names = F)
+
+
+
+
+
+
+
 
 
 ####################
