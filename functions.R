@@ -1,32 +1,8 @@
-library(igraph)
-library(readxl)
-library(geojsonR)
-library(geosphere)
-library(tidyr)
-
-### Labels for each geography:
-#   - NUM: Closeness centrality from ONS OD matrix (Azure)
-#   - NUM: Betweenness centrality from ONS OD matrix (Azure)
-#   - NUM: Distance from nearest local high density area (?)
-#   - NUM: Population density (Compute from Shp)
-#   - NUM: Median age (Compute from SPC - Azure)
-#   - NUM: Index of deprivation (2019; https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019)
-
-### METHODS: xgboost, SHAP
-
 ### TO DO:
 #   Check def of betweenness
 #   Check def of closeness
 #   Refine distance to nearest HPD area
 #   Do better than deprivation rank?
-
-folderIn <- "Data"
-fdl <- "dl"
-farea <- "area"
-folderOut <- "Output"
-fplot <- "plots"
-
-set.seed(18061815)
 
 
 ##############################
@@ -35,6 +11,22 @@ set.seed(18061815)
 ##############################
 ##############################
 
+
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+# For testing
+#area_name = "west-yorkshire"
+#scale = "LSOA11CD"
+#scale = "MSOA11CD"
+#scale = "LAD20CD"
+#date = 2020
+#data = dataWY
+#dataS <- data
+#data <- dataS
+#i = 1
+
+#colnames(data)
+#head(data)
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
 
 downloadPrerequisites <- function(folderIn,fdl){
   n <- 0
@@ -114,25 +106,9 @@ loadArea <- function(name,date,folderIn,farea,country = "England"){
   return(res)
 }
 
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
-# For testing
-area_name = "west-yorkshire"
-scale = "LSOA11CD"
-scale = "MSOA11CD"
-scale = "LAD20CD"
-date = 2020
-#data = dataWY
-dataS <- data
-#data <- dataS
-i = 1
-
-colnames(data)
-head(data)
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
-
 # area_name and date must point to one of the .csv files on Azure
 # Min scale is LSOA due to source control data
-# Taken from global environment: ,folderIn, farea, lu, betweenness_global, closeness_global, popArea_lsoa_global, depriv_global
+# Taken from global environment: folderIn, farea, lu, betweenness_global, closeness_global, popArea_lsoa_global, depriv_global
 prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), data = NULL){
   # Load and trim Azure file (needed for median age)
   if(is.null(data)){
@@ -148,7 +124,7 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
   list_area <- unique(lu_area[,scale])
   #
   labels_area <- data.frame(area = list_area, closeness = NA, betweenness = NA, distHPD = NA,
-                          popDens = NA, medAge = NA, deprivation = NA)
+                            popDens = NA, medAge = NA, deprivation = NA)
   colnames(labels_area)[1] <- scale
   # Centrality
   if(scale == "LSOA11CD"){
@@ -208,35 +184,23 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
     }
     labels_area$deprivation[i] <- sum(deprivs * pops) / sum(pops)
   }
-  write.table(labels_area,file.path(folderOut,paste("labels_",area_name,"_",date,".csv",sep = "")),sep = ",",row.names = F)
+  write.table(labels_area,file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")),sep = ",",row.names = F)
   print(paste("Done! Saved labels to",file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")),sep = " "))
   return(labels_area)
 }
 
-
-
 ######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
-downloadPrerequisites(folderIn,fdl)
-loadPrerequisites(folderIn,fdl)
+# For testing
+#downloadPrerequisites(folderIn,fdl)
+#loadPrerequisites(folderIn,fdl)
 
-dataWY <- loadArea("west-yorkshire",2020,folderIn,farea)
+#dataWY <- loadArea("west-yorkshire",2020,folderIn,farea)
 
-test <- prepareLabels("west-yorkshire", 2020, scale = "LSOA11CD", data = NULL)
-test <- prepareLabels("west-yorkshire", 2020, scale = "MSOA11CD", data = NULL)
-test <- prepareLabels("west-yorkshire", 2020, scale = "LAD20CD", data = NULL)
-test <- prepareLabels("west-yorkshire", 2020, scale = "LSOA11CD", data = dataWY)
+#test <- prepareLabels("west-yorkshire", 2020, scale = "LSOA11CD", data = NULL)
+#test <- prepareLabels("west-yorkshire", 2020, scale = "MSOA11CD", data = NULL)
+#test <- prepareLabels("west-yorkshire", 2020, scale = "LAD20CD", data = NULL)
+#test <- prepareLabels("west-yorkshire", 2020, scale = "LSOA11CD", data = dataWY)
 ######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
-
-
-
-
-
-
-
-
-
-
-
 
 
 ####################
@@ -246,211 +210,117 @@ test <- prepareLabels("west-yorkshire", 2020, scale = "LSOA11CD", data = dataWY)
 ####################
 
 
-library(xgboost)
-library(shapr)
-
-data("Boston", package = "MASS")
-
-x_var <- c("lstat", "rm", "dis", "indus")
-y_var <- "medv"
-
-x_train <- as.matrix(Boston[-1:-6, x_var])
-y_train <- Boston[-1:-6, y_var]
-x_test <- as.matrix(Boston[1:6, x_var])
-
-# Fitting a basic xgboost model to the training data
-model <- xgboost(
-  data = x_train,
-  label = y_train,
-  nround = 20,
-  verbose = FALSE
-)
-
-# Prepare the data for explanation
-explainer <- shapr(x_train, model)
-#> The specified model provides feature classes that are NA. The classes of data are taken as the truth.
-
-# Specifying the phi_0, i.e. the expected prediction without any features
-p <- mean(y_train)
-
-# Computing the actual Shapley values with kernelSHAP accounting for feature dependence using
-# the empirical (conditional) distribution approach with bandwidth parameter sigma = 0.1 (default)
-explanation <- explain(
-  x_test,
-  approach = "empirical",
-  explainer = explainer,
-  prediction_zero = p
-)
-
-# Printing the Shapley values for the test data.
-# For more information about the interpretation of the values in the table, see ?shapr::explain.
-print(explanation$dt)
-#>      none     lstat         rm       dis      indus
-#> 1: 22.446 5.2632030 -1.2526613 0.2920444  4.5528644
-#> 2: 22.446 0.1671901 -0.7088401 0.9689005  0.3786871
-#> 3: 22.446 5.9888022  5.5450858 0.5660134 -1.4304351
-#> 4: 22.446 8.2142204  0.7507572 0.1893366  1.8298304
-#> 5: 22.446 0.5059898  5.6875103 0.8432238  2.2471150
-#> 6: 22.446 1.9929673 -3.6001958 0.8601984  3.1510531
-
-# Plot the resulting explanations for observations 1 and 6
-plot(explanation, plot_phi0 = FALSE, index_x_test = c(1, 6))
-
-# Use the Gaussian approach
-explanation_gaussian <- explain(
-  x_test,
-  approach = "gaussian",
-  explainer = explainer,
-  prediction_zero = p
-)
-
-# Plot the resulting explanations for observations 1 and 6
-plot(explanation_gaussian, plot_phi0 = FALSE, index_x_test = c(1, 6))
-
-# Use the Gaussian copula approach
-explanation_copula <- explain(
-  x_test,
-  approach = "copula",
-  explainer = explainer,
-  prediction_zero = p
-)
-
-# Plot the resulting explanations for observations 1 and 6, excluding
-# the no-covariate effect
-plot(explanation_copula, plot_phi0 = FALSE, index_x_test = c(1, 6))
-
-# Use the conditional inference tree approach
-explanation_ctree <- explain(
-  x_test,
-  approach = "ctree",
-  explainer = explainer,
-  prediction_zero = p
-)
-
-# Plot the resulting explanations for observations 1 and 6, excluding 
-# the no-covariate effect
-plot(explanation_ctree, plot_phi0 = FALSE, index_x_test = c(1, 6))
-
-
-###
-
-
-#######
-####### Test of SHAP on WY data
-#######
-
-
-# Predictors
-labels_WY
-
-# Predictions
-testWY_sal <- moments("incomeH",dataWYnotNA,scale = "MSOA11CD",lu)
-
-# Check MSOAs are ordered properlyt
-labels_WY$MSOA11CD == testWY$area
-
-# Training set
-x_train <- as.matrix(labels_WY[-1:-20,2:7])
-
-# Results: Order 1-4: mean, sd, skewness, kurtosis
-y_train_1 <- testWY_sal[-1:-20, "mean"]
-y_train_2 <- testWY_sal[-1:-20, "sd"]
-y_train_3 <- testWY_sal[-1:-20, "skewness"]
-y_train_4 <- testWY_sal[-1:-20, "kurtosis"]
-
-# Test set
-x_test <- as.matrix(labels_WY[1:20, 2:7])
-
-### Mean
-
-# Fitting a basic xgboost model to the training data
-model <- xgboost(
-  data = x_train,
-  label = y_train_1,
-  nround = 20,
-  verbose = FALSE
-)
-# Explanation
-explainer <- shapr(x_train, model)
-explanation_1 <- explain(
-  x_test,
-  approach = "empirical",
-  explainer = explainer,
-  prediction_zero = mean(y_train_1)
-)
-
-###
-model <- xgboost(
-  data = x_train,
-  label = y_train_2,
-  nround = 20,
-  verbose = FALSE
-)
-# Explanation
-explainer <- shapr(x_train, model)
-explanation_2 <- explain(
-  x_test,
-  approach = "empirical",
-  explainer = explainer,
-  prediction_zero = mean(y_train_2)
-)
-
-###
-model <- xgboost(
-  data = x_train,
-  label = y_train_3,
-  nround = 20,
-  verbose = FALSE
-)
-# Explanation
-explainer <- shapr(x_train, model)
-explanation_3 <- explain(
-  x_test,
-  approach = "empirical",
-  explainer = explainer,
-  prediction_zero = mean(y_train_3)
-)
-
-###
-model <- xgboost(
-  data = x_train,
-  label = y_train_4,
-  nround = 20,
-  verbose = FALSE
-)
-# Explanation
-explainer <- shapr(x_train, model)
-explanation_4 <- explain(
-  x_test,
-  approach = "empirical",
-  explainer = explainer,
-  prediction_zero = mean(y_train_4)
-)
-
-# Printing the Shapley values for the test data.
-print(explanation_1$dt)
-
-# Plot the resulting explanations for observations 1 and 6
-plot(explanation_1, plot_phi0 = FALSE, index_x_test = c(1:4))
-
-avg1 <- colSums(abs(explanation_1$dt[,2:7]))/20
-avg2 <- colSums(abs(explanation_2$dt[,2:7]))/20
-avg3 <- colSums(abs(explanation_3$dt[,2:7]))/20
-avg4 <- colSums(abs(explanation_4$dt[,2:7]))/20
-
-res <- rbind(avg1,avg2,avg3,avg4)
-row.names(res) <- c("Mean", "Sd", "Skewness", "Kurotsis")
-res <- t(res)
-
-for(i in 1:4){
-  res[,i] <- res[,i]/max(res[,i])
+# Taken from global environment: folderOut
+loadLabels <- function(area_name,date, scale){
+  if(file.exists(file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")))){
+    print(paste("Loading",file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")),sep = " "))
+    ret <- read.csv(file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")))
+    return(ret)
+  }else{
+    print(paste("File",file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")),"is missing",sep = " "))
+  }
 }
 
-image(1:ncol(res), 1:nrow(res), t(res), axes = FALSE, main = "West Yorshire salaries; relative importance norm. per column")
-axis(1, 1:ncol(res), colnames(res))
-axis(2, 1:nrow(res), rownames(res))
+# Extract first four moments for one distribution as vector
+findmoments <- function(dstrb, graph = TRUE){
+  step <- descdist(dstrb, discrete = FALSE, graph = graph)
+  return(c(step$mean,step$sd,step$skewness,step$kurtosis))
+}
 
-image(res, axes = FALSE)
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+# For testing
+#area_name = "west-yorkshire"
+#scale = "LSOA11CD"
+#scale = "MSOA11CD"
+#scale = "LAD20CD"
+#date = 2020
+#variable_name = "incomeH"
+#aggregation = "mean"
+#ntrain = 2
 
+#data = dataWY
+#dataS <- data
+#data <- dataS
+#i = 1
 
+#colnames(data)
+#head(data)
+#unique(dataS$LAD20CD)
 
+#test <- runSHAP(area_name, date, scale, "incomeH", 3)
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+
+# Taken from global environment: folderIn, farea, lu
+runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), variable_name, ntrain,aggregation = "mean", data = NULL){
+  scale <- match.arg(scale)
+  # Load and trim Azure file
+  if(is.null(data)){
+    data <- loadArea(area_name,date,folderIn,farea)
+  }
+  data <- merge(data,lu[,c("OA11CD","LSOA11CD","MSOA11CD","LAD20CD")], by.x = "OA11CD", by.y = "OA11CD", all.x = T)
+  predictions <- data[,c(variable_name,scale)]
+  # Load predictors
+  predictors <- loadLabels(area_name,date,scale)
+  # Remove NA values and check area lists match
+  save_area_list <- unique(predictions[,scale])
+  save_pred_list <- unique(predictors[,scale])
+  #
+  predictions <- predictions[complete.cases(predictions), ]
+  new_area_list <- unique(predictions[,scale])
+  removed_area_NA <- setdiff(save_area_list, new_area_list)
+  #
+  predictors <- predictors[complete.cases(predictors), ]
+  new_pred_list <- unique(predictors[,scale])
+  removed_pred_NA <- setdiff(save_pred_list, new_pred_list)
+  #
+  final_area_list <- sort(intersect(new_area_list,new_pred_list), decreasing = FALSE)
+  l <- length(final_area_list)
+  removed_dont_match <- setdiff(new_area_list, new_pred_list)
+  #
+  if(length(removed_area_NA) > 0){
+    print(paste("Removed",removed_area_NA,"due to all", variable_name,"are NA inside the area", sep = " "))
+  }
+  if(length(removed_area_NA) > 0){
+    print(paste("Removed",removed_pred_NA,"due to some NA values within the predictors", sep = " "))
+  }
+  if(length(removed_dont_match) > 0){
+    print(paste("Removed",removed_dont_match,"due to these areas not existing in one of the datasets", sep = " "))
+  }
+  # 
+  predictors <- predictors[predictors[,scale] %in% final_area_list,]
+  predictors <- predictors[order(predictors[,scale]),]
+  row.names(predictors) <- 1:nrow(predictors)
+  # Get predictions (moments)
+  print("Finished loading the data. Calculating predictions...")
+  moments <- data.frame(area = rep(NA,l), mean = NA, sd = NA, skewness = NA, kurtosis = NA)
+  colnames(moments)[1] <- scale
+  for(i in 1:l){
+    ref <- which(predictions[,scale] %in% new_area_list[i])
+    moments[i,1] <- new_area_list[i]
+    moments[i,2:5] <- findmoments(predictions[ref,variable_name], graph = FALSE)
+  }
+  moments <- moments[order(moments[,scale]),]
+  row.names(moments) <- 1:nrow(moments)
+  # Run SHAP
+  print("Running SHAP...")
+  testSet <- sample(1:l, ntrain)
+  x_train <- as.matrix(predictors[-testSet,2:ncol(predictors)])
+  y_train_mean <- moments[-testSet, "mean"]
+  y_train_sd <- moments[-testSet, "sd"]
+  y_train_skew <- moments[-testSet, "skewness"]
+  y_train_kurt <- moments[-testSet, "kurtosis"]
+  x_test <- as.matrix(predictors[testSet, 2:ncol(predictors)])
+  model <- xgboost(data = x_train,label = y_train_mean,nround = 20,verbose = FALSE)
+  explainer <- shapr(x_train, model)
+  explanation_mean <- explain(x_test,approach = "empirical",explainer = explainer,prediction_zero = mean(y_train_mean))
+  model <- xgboost(data = x_train,label = y_train_sd,nround = 20,verbose = FALSE)
+  explainer <- shapr(x_train, model)
+  explanation_sd <- explain(x_test,approach = "empirical",explainer = explainer,prediction_zero = mean(y_train_sd))
+  model <- xgboost(data = x_train,label = y_train_skew,nround = 20,verbose = FALSE)
+  explainer <- shapr(x_train, model)
+  explanation_skew <- explain(x_test,approach = "empirical",explainer = explainer,prediction_zero = mean(y_train_skew))
+  model <- xgboost(data = x_train,label = y_train_kurt,nround = 20,verbose = FALSE)
+  explainer <- shapr(x_train, model)
+  explanation_kurt <- explain(x_test,approach = "empirical",explainer = explainer,prediction_zero = mean(y_train_kurt))
+  return(list(explanation_mean$dt,explanation_sd$dt,explanation_skew$dt,explanation_kurt$dt))
+}
