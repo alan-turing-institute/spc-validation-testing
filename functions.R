@@ -251,7 +251,7 @@ findmoments <- function(dstrb, graph = TRUE){
 ######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
 
 # Taken from global environment: folderIn, farea, lu
-runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), variable_name, ntrain,aggregation = "mean", data = NULL){
+runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), variable_name, ntrain, data = NULL, predictors = NULL){
   scale <- match.arg(scale)
   # Load and trim Azure file
   if(is.null(data)){
@@ -260,7 +260,9 @@ runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"),
   data <- merge(data,lu[,c("OA11CD","LSOA11CD","MSOA11CD","LAD20CD")], by.x = "OA11CD", by.y = "OA11CD", all.x = T)
   predictions <- data[,c(variable_name,scale)]
   # Load predictors
-  predictors <- loadLabels(area_name,date,scale)
+  if(is.null(predictors)){
+    predictors <- loadLabels(area_name,date,scale)
+  }
   # Remove NA values and check area lists match
   save_area_list <- unique(predictions[,scale])
   save_pred_list <- unique(predictors[,scale])
@@ -322,5 +324,85 @@ runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"),
   model <- xgboost(data = x_train,label = y_train_kurt,nround = 20,verbose = FALSE)
   explainer <- shapr(x_train, model)
   explanation_kurt <- explain(x_test,approach = "empirical",explainer = explainer,prediction_zero = mean(y_train_kurt))
-  return(list(explanation_mean$dt,explanation_sd$dt,explanation_skew$dt,explanation_kurt$dt))
+  return(list(explanation_mean$dt,explanation_sd$dt,explanation_skew$dt,explanation_kurt$dt,c(area_name, date, scale, variable_name)))
+}
+
+plotSHAP <- function(resSHAP, folderOut, fplot){
+  resMean <- resSHAP[[1]]
+  resSd <- resSHAP[[2]]
+  resSkew <- resSHAP[[3]]
+  resKurt <- resSHAP[[4]]
+  info <- resSHAP[[5]]
+  ### Plot means
+  avg1 <- colSums(resMean[,2:7])/nrow(resMean)
+  avg2 <- colSums(resSd[,2:7])/nrow(resSd)
+  avg3 <- colSums(resSkew[,2:7])/nrow(resSkew)
+  avg4 <- colSums(resKurt[,2:7])/nrow(resKurt)
+  res <- rbind(avg1,avg2,avg3,avg4)
+  row.names(res) <- c("Mean", "Sd", "Skewness", "Kurotsis")
+  res <- t(res)
+  ### Plot means norm by moment column
+  avg11 <- colSums(resMean[,2:ncol(resMean)])/nrow(resMean)
+  avg21 <- colSums(resSd[,2:ncol(resSd)])/nrow(resSd)
+  avg31 <- colSums(resSkew[,2:ncol(resSkew)])/nrow(resSkew)
+  avg41 <- colSums(resKurt[,2:ncol(resKurt)])/nrow(resKurt)
+  res2 <- rbind(avg11,avg21,avg31,avg41)
+  for(i in 1:4){
+    res2[,i] <- res2[,i]/max(res2[,i])
+  }
+  row.names(res2) <- c("Mean", "Sd", "Skewness", "Kurotsis")
+  res2 <- t(res2)
+  #
+  png(file=file.path(folderOut,fplot,paste(info[1], info[2], info[3], info[4], "feature_importance.png", sep = "-")), width=1250, height=625)
+  par(mfrow = c(1,2))
+  image(1:ncol(res), 1:nrow(res), t(res), axes = FALSE, col = hcl.colors(12, "Plasma", rev = TRUE),
+        main = paste(info[1], info[2], info[3], info[4], "; average importance", sep = " "))
+  axis(1, 1:ncol(res), colnames(res))
+  axis(2, 1:nrow(res), rownames(res))
+  image(1:ncol(res2), 1:nrow(res2), t(res2), axes = FALSE, col = hcl.colors(12, "Plasma", rev = TRUE),
+        main = paste(info[1], info[2], info[3], info[4], "; average importance norm. p. column", sep = " "))
+  axis(1, 1:ncol(res2), colnames(res2))
+  axis(2, 1:nrow(res2), rownames(res2))
+  dev.off()
+  print(paste("Plot saved in ", file.path(folderOut,fplot), "/", sep = ""))
+}
+
+ggplotSHAP2 <- function(resSHAP, folderOut, fplot){
+  resMean <- resSHAP[[1]]
+  resSd <- resSHAP[[2]]
+  resSkew <- resSHAP[[3]]
+  resKurt <- resSHAP[[4]]
+  info <- resSHAP[[5]]
+  ### Plot means
+  avg1 <- colSums(resMean[,2:7])/nrow(resMean)
+  avg2 <- colSums(resSd[,2:7])/nrow(resSd)
+  avg3 <- colSums(resSkew[,2:7])/nrow(resSkew)
+  avg4 <- colSums(resKurt[,2:7])/nrow(resKurt)
+  res <- rbind(avg1,avg2,avg3,avg4)
+  row.names(res) <- c("Mean", "Sd", "Skewness", "Kurotsis")
+  res <- t(res)
+  ### Plot means norm by moment column
+  avg11 <- colSums(resMean[,2:ncol(resMean)])/nrow(resMean)
+  avg21 <- colSums(resSd[,2:ncol(resSd)])/nrow(resSd)
+  avg31 <- colSums(resSkew[,2:ncol(resSkew)])/nrow(resSkew)
+  avg41 <- colSums(resKurt[,2:ncol(resKurt)])/nrow(resKurt)
+  res2 <- rbind(avg11,avg21,avg31,avg41)
+  for(i in 1:4){
+    res2[,i] <- res2[,i]/max(res2[,i])
+  }
+  row.names(res2) <- c("Mean", "Sd", "Skewness", "Kurotsis")
+  res2 <- t(res2)
+  #
+  png(file=file.path(folderOut,fplot,paste(info[1], info[2], info[3], info[4], "feature_importance_gg.png", sep = "-")), width=1250, height=625)
+  par(mfrow = c(1,2))
+  image(1:ncol(res), 1:nrow(res), t(res), axes = FALSE, col = hcl.colors(7, "Blue-Red", rev = TRUE),
+        main = paste(info[1], info[2], info[3], info[4], "; average importance", sep = " "))
+  axis(1, 1:ncol(res), colnames(res))
+  axis(2, 1:nrow(res), rownames(res))
+  image(1:ncol(res2), 1:nrow(res2), t(res2), axes = FALSE, col = hcl.colors(7, "Blue-Red", rev = TRUE),
+        main = paste(info[1], info[2], info[3], info[4], "; average importance norm. p. column", sep = " "))
+  axis(1, 1:ncol(res2), colnames(res2))
+  axis(2, 1:nrow(res2), rownames(res2))
+  dev.off()
+  print(paste("Plot saved in ", file.path(folderOut,fplot), "/", sep = ""))
 }

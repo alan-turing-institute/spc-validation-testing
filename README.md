@@ -2,6 +2,12 @@
 
 WIP to create a robust data validation method for https://github.com/alan-turing-institute/uatk-spc
 
+## USAGE
+
+Currently, there are two types of analyses that can be run somewhat easily:
+- Moment-based clustering, use `clean.R`
+- XAI (SHAP), use `runXAI.R` (not optimised and methods will be made more robust, but script = easy steps to follow)
+
 ## Original issue
 
 **Algorithm 1** learns the SPC dataset, attempts to cluster distributions & flags outliers
