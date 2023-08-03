@@ -6,7 +6,7 @@ WIP to create a robust data validation method for https://github.com/alan-turing
 
 Currently, there are two types of analyses that can be run somewhat easily:
 - Moment-based clustering, use `clean.R`
-- XAI (SHAP), use `runXAI.R` (not optimised and methods will be made more robust, but script = easy steps to follow)
+- XAI (SHAP), use `runXAI.R` (not optimised and methods will be made more robust, but script = easy steps to follow; results should look like [this](https://github.com/alan-turing-institute/spc-validation-testing/blob/main/Output/plots/west-yorkshire-2020-MSOA11CD-incomeH-feature_importance_gg.png) for now)
 
 ## Original issue
 
