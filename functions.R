@@ -38,10 +38,10 @@ downloadPrerequisites <- function(folderIn,fdl){
     n <- n+1
   }
   # OD matrix
-  if(!(file.exists(file.path(folderIn,fdl,"commutingOD.csv")))){
+  if(!(file.exists(file.path(folderIn,fdl,"wf01bew_oa.zip")))){
     print("Downloading commuting matrix...")
-    download.file(url = "https://ramp0storage.blob.core.windows.net/nationaldata/commutingOD.gz", destfile = file.path(folderIn,fdl,"commutingOD.csv.gz"))
-    gunzip(file.path(folderIn,fdl,"commutingOD.csv.gz"))
+    download.file(url = "https://www.nomisweb.co.uk/output/census/2011/wf01bew_oa.zip", destfile = file.path(folderIn,fdl,"wf01bew_oa.zip"))
+    unzip(file.path(folderIn,fdl,"wf01bew_oa.zip"), exdir = file.path(folderIn,fdl))
     n <- n+1
   }
   # Pop at LSOA scale
@@ -57,23 +57,71 @@ downloadPrerequisites <- function(folderIn,fdl){
     download.file(url = url, destfile = file.path(folderIn,fdl,"deprivation.xlsx"))
     n <- n+1
   }
-  print(paste("Downloaded", n, "new files, skipped", 4-n, "files that already exists", sep = " "))
+  print(paste("Downloaded", n, "new files, skipped", 4-n, "files that already exist", sep = " "))
 }
 
-loadPrerequisites <- function(folderIn,fdl){
+loadPrerequisites <- function(folderIn,fdl,scale = c("LSOA", "MSOA")){
+  scale = match.arg(scale)
   # LookUp table
+  print("Loading look-up table...")
   assign("lu", read.csv(file.path(folderIn,fdl,"lookUp-GB.csv")), envir = globalenv())
   # Centrality from OD matrix as network
-  OD <- read.csv(file.path(folderIn,fdl,"commutingOD.csv"), header = T)
-  OD_wide <- pivot_wider(OD, names_from = HomeMSOA, values_from = Total_Flow)
-  OD_wide <- as.matrix(OD_wide)
-  OD_wide_prep <- OD_wide[,2:ncol(OD_wide)]
-  rownames(OD_wide_prep) <- OD_wide[,1]
-  OD_net <- graph_from_adjacency_matrix(OD_wide_prep, mode = "directed", weighted = TRUE, diag = TRUE)
-  print("Calculating betweenness centrality, this can take several minutes...")
-  assign("betweenness_global", betweenness(OD_net,directed = TRUE, normalized = TRUE), envir = globalenv())
-  print("Calculating closeness centrality, this can take several minutes...")
-  assign("closeness_global", closeness(OD_net, mode = "all", normalized = TRUE), envir = globalenv())
+  betwPath <- file.path(folderIn,fdl,paste("betweenness_",scale,".csv",sep = ""))
+  closPath <- file.path(folderIn,fdl,paste("closeness_",scale,".csv",sep = ""))
+  if(file.exists(betwPath) & file.exists(closPath)){
+    print("Loading closeness and betweenness centrality data from existing save files...")
+    betw0 <- read.csv(betwPath)
+    betw <- betw0$betweenness
+    names(betw) <- betw0$area
+    clos0 <- read.csv(closPath)
+    clos <- clos$closeness
+    names(clos) <- clos$area
+    assign("betweenness_global", betw, envir = globalenv())
+    assign("closeness_global", clos, envir = globalenv())
+  }else{
+    if(file.exists(file.path(folderOut,paste("commutingOD_",scale,".csv",sep = "")))){
+      OD <- read.csv(file.path(folderOut,paste("commutingOD_",scale,".csv",sep = "")))
+    }else{
+      OD <- read.csv(file.path(folderIn,fdl,"wf01bew_oa.csv"), header = T)
+      lu2 <- lu[,c("OA11CD",scale)]
+      temp <- merge(OD,lu2,by.x="Area.of.workplace",by.y="OA11CD", all.x = TRUE)
+      temp <- temp[!is.na(temp[,scale]),c(2,4,3)]
+      colnames(temp)[2] <- c("Destination")
+      temp <- merge(temp,lu2,by.x="Area.of.usual.residence",by.y="OA11CD",all.x = TRUE)
+      temp <- temp[!is.na(temp[,scale]),c(4,2,3)]
+      colnames(temp)[1] <- c("Home")
+      OD <- aggregate(temp$count, by = list(temp$Home,temp$Destination),FUN=sum)
+      colnames(OD) <- c("Home","Destination","Count")
+      OD <- OD[order(OD$Home,OD$Destination),]
+      row.names(OD) <- 1:nrow(OD)
+      write.table(OD,file.path(folderOut,paste("commutingOD_",scale,".csv",sep = "")),sep = ",",row.names = F)
+    }
+    if(length(grep("E",unique(lu[,scale]))) +  length(grep("W",unique(lu[,scale]))) > length(unique(OD$Home))){
+      warning("Some areas are missing from the OD matrix as home locations")
+    }
+    if(length(grep("E",unique(lu[,scale]))) +  length(grep("W",unique(lu[,scale]))) > length(unique(OD$Destination))){
+      warning("Some areas are missing from the OD matrix as destinations")
+    }
+    OD_wide <- pivot_wider(OD, names_from = Home, values_from = Count)
+    OD_wide[is.na(OD_wide)] <- 0
+    OD_wide <- as.matrix(OD_wide)
+    OD_wide_prep <- matrix(as.numeric(OD_wide[,2:ncol(OD_wide)]), ncol = ncol(OD_wide) - 1)
+    rownames(OD_wide_prep) <- OD_wide[,1]
+    colnames(OD_wide_prep) <- colnames(OD_wide)[2:ncol(OD_wide)]
+    OD_wide_prep <- OD_wide_prep[order(rownames(OD_wide_prep)),order(colnames(OD_wide_prep))]
+    if(length(which(rownames(OD_wide_prep) != colnames(OD_wide_prep))) > 1){
+      stop("OD matrix isn't square")
+    }
+    OD_net <- graph_from_adjacency_matrix(OD_wide_prep, mode = "directed", weighted = TRUE, diag = TRUE)
+    print("Calculating betweenness centrality, this can take several minutes...")
+    betw <- betweenness(OD_net,directed = TRUE, normalized = TRUE)
+    assign("betweenness_global", betw, envir = globalenv())
+    write.table(data.frame(area = names(betw), betweenness = betw),betwPath,sep = ",",row.names = F)
+    print("Calculating closeness centrality, this can take several minutes...")
+    clos <- closeness(OD_net, mode = "all", normalized = TRUE)
+    assign("closeness_global", clos, envir = globalenv())
+    write.table(data.frame(area = names(clos), closeness = clos),closPath,sep = ",",row.names = F)
+  }
   # LSOA pop
   print("Loading the heavy geojson file...")
   lsoa_js <- FROM_GeoJson(url_file_string = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
@@ -130,8 +178,14 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
   if(scale == "LSOA11CD"){
     print("OD data is at MSOA scale, using parent MSOA")
     for(i in 1:length(list_area)){
-      labels_area$betweenness[i] <- betweenness_global[names(betweenness_global) == lu_area$MSOA11CD[i]] * 100000
-      labels_area$closeness[i] <- closeness_global[names(closeness_global) == lu_area$MSOA11CD[i]] * 10
+      b <- betweenness_global[names(betweenness_global) == lu_area$MSOA11CD[i]]
+      c <- closeness_global[names(closeness_global) == lu_area$MSOA11CD[i]]
+      if(length(b) == 1){
+        labels_area$betweenness[i] <- b * 100000
+      }
+      if(length(c) == 1){
+        labels_area$closeness[i] <- c * 10
+      }
     }
   }else if(scale == "MSOA11CD"){
     for(i in 1:length(list_area)){
