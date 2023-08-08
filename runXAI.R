@@ -41,9 +41,10 @@ dir.create(folderOut)
 dir.create(file.path(folderOut,fplot))
 
 downloadPrerequisites(folderIn,fdl)
-loadPrerequisites(folderIn,fdl)
+# Make sure to select the scale you intend to work with later (for LAD20CD, use MSOA11CD here)
+loadPrerequisites(folderIn,fdl,scale = "MSOA11CD")
 # After these two steps, the following should be loaded into the global environment: 
-#   folderIn, farea, lu, betweenness_global, closeness_global, popArea_lsoa_global, depriv_global
+#   folderIn, farea, lu, betweenness_global, closeness_global_all, closeness_global_in, closeness_global_out, popArea_lsoa_global, depriv_global
 
 
 ########################
@@ -68,5 +69,5 @@ test <- runSHAP("west-yorkshire", 2020, "MSOA11CD", "incomeH", 20)
 #test <- runSHAP("west-yorkshire", 2020, "LSOA11CD", "incomeH", 20, data = dataWY, predictors = test)
 
 # Output plots (writes a png)
-plotSHAP(test, folderOut, fplot)
+#plotSHAP(test, folderOut, fplot)
 ggplotSHAP2(test, folderOut, fplot)

@@ -1,6 +1,4 @@
 ### TO DO:
-#   Check def of betweenness
-#   Check def of closeness
 #   Refine distance to nearest HPD area
 #   Do better than deprivation rank?
 
@@ -60,7 +58,23 @@ downloadPrerequisites <- function(folderIn,fdl){
   print(paste("Downloaded", n, "new files, skipped", 4-n, "files that already exist", sep = " "))
 }
 
-loadPrerequisites <- function(folderIn,fdl,scale = c("LSOA", "MSOA")){
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+###### Check centrality meaning ######
+#M <- matrix(c(1,0,2,3,0,3,0,2,3,1,1,3,0,2,1,1), ncol = 4)
+#M
+#n <- graph_from_adjacency_matrix(M, mode = "directed",weight = TRUE)
+#n2 <- graph_from_adjacency_matrix(M, mode = "undirected",weight = TRUE)
+#plot(n)
+#plot(n2)
+
+#betweenness(n,directed = TRUE, weights = 1/edge_attr(n, "weight"), normalized = FALSE)
+#betweenness(n,directed = TRUE, weights = edge_attr(n, "weight"), normalized = FALSE)
+#betweenness(n,directed = TRUE, weights = rep(1,length(E(n))), normalized = FALSE)
+#betweenness(n,directed = FALSE, weights = rep(1,length(E(n))), normalized = FALSE)
+#betweenness(n,directed = TRUE, normalized = FALSE)
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+     
+loadPrerequisites <- function(folderIn,fdl,scale = c("LSOA11CD", "MSOA11CD")){
   scale = match.arg(scale)
   # LookUp table
   print("Loading look-up table...")
@@ -73,11 +87,17 @@ loadPrerequisites <- function(folderIn,fdl,scale = c("LSOA", "MSOA")){
     betw0 <- read.csv(betwPath)
     betw <- betw0$betweenness
     names(betw) <- betw0$area
-    clos0 <- read.csv(closPath)
-    clos <- clos$closeness
-    names(clos) <- clos$area
+    clos <- read.csv(closPath)
+    clos_all <- clos$closeness_all
+    clos_in <- clos$closeness_in
+    clos_out <- clos$closeness_out
+    names(clos_all) <- clos$area
+    names(clos_in) <- clos$area
+    names(clos_out) <- clos$area
     assign("betweenness_global", betw, envir = globalenv())
-    assign("closeness_global", clos, envir = globalenv())
+    assign("closeness_global_all", clos_all, envir = globalenv())
+    assign("closeness_global_in", clos_in, envir = globalenv())
+    assign("closeness_global_out", clos_out, envir = globalenv())
   }else{
     if(file.exists(file.path(folderOut,paste("commutingOD_",scale,".csv",sep = "")))){
       OD <- read.csv(file.path(folderOut,paste("commutingOD_",scale,".csv",sep = "")))
@@ -109,18 +129,24 @@ loadPrerequisites <- function(folderIn,fdl,scale = c("LSOA", "MSOA")){
     rownames(OD_wide_prep) <- OD_wide[,1]
     colnames(OD_wide_prep) <- colnames(OD_wide)[2:ncol(OD_wide)]
     OD_wide_prep <- OD_wide_prep[order(rownames(OD_wide_prep)),order(colnames(OD_wide_prep))]
+    OD_wide_prep <- t(OD_wide_prep)
     if(length(which(rownames(OD_wide_prep) != colnames(OD_wide_prep))) > 1){
       stop("OD matrix isn't square")
     }
     OD_net <- graph_from_adjacency_matrix(OD_wide_prep, mode = "directed", weighted = TRUE, diag = TRUE)
+    edge_attr(OD_net, "weight") <- 1/edge_attr(OD_net, "weight")
     print("Calculating betweenness centrality, this can take several minutes...")
-    betw <- betweenness(OD_net,directed = TRUE, normalized = TRUE)
+    betw <- betweenness(OD_net,directed = TRUE, normalized = FALSE)
     assign("betweenness_global", betw, envir = globalenv())
     write.table(data.frame(area = names(betw), betweenness = betw),betwPath,sep = ",",row.names = F)
     print("Calculating closeness centrality, this can take several minutes...")
-    clos <- closeness(OD_net, mode = "all", normalized = TRUE)
-    assign("closeness_global", clos, envir = globalenv())
-    write.table(data.frame(area = names(clos), closeness = clos),closPath,sep = ",",row.names = F)
+    clos_all <- closeness(OD_net, mode = "all", normalized = FALSE)
+    clos_in <- closeness(OD_net, mode = "in", normalized = FALSE)
+    clos_out <- closeness(OD_net, mode = "out", normalized = FALSE)
+    assign("closeness_global_all", clos_all, envir = globalenv())
+    assign("closeness_global_in", clos_in, envir = globalenv())
+    assign("closeness_global_out", clos_out, envir = globalenv())
+    write.table(data.frame(area = names(clos_all), closeness_all = clos_all, closeness_in = clos_in, closeness_out = clos_out),closPath,sep = ",",row.names = F)
   }
   # LSOA pop
   print("Loading the heavy geojson file...")
@@ -171,41 +197,37 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
   lu_area <- merge(lu_area, popArea_lsoa_global, by.x = "LSOA11CD", by.y = "LSOA11CD", all.x = T)
   list_area <- unique(lu_area[,scale])
   #
-  labels_area <- data.frame(area = list_area, closeness = NA, betweenness = NA, distHPD = NA,
+  labels_area <- data.frame(area = list_area, closeness_all = NA, closeness_in = NA, closeness_out = NA, betweenness = NA, distHPD = NA,
                             popDens = NA, medAge = NA, deprivation = NA)
   colnames(labels_area)[1] <- scale
   # Centrality
-  if(scale == "LSOA11CD"){
-    print("OD data is at MSOA scale, using parent MSOA")
+  if(scale == "MSOA11CD" | scale == "LSOA11CD"){
     for(i in 1:length(list_area)){
-      b <- betweenness_global[names(betweenness_global) == lu_area$MSOA11CD[i]]
-      c <- closeness_global[names(closeness_global) == lu_area$MSOA11CD[i]]
-      if(length(b) == 1){
-        labels_area$betweenness[i] <- b * 100000
-      }
-      if(length(c) == 1){
-        labels_area$closeness[i] <- c * 10
-      }
-    }
-  }else if(scale == "MSOA11CD"){
-    for(i in 1:length(list_area)){
-      labels_area$betweenness[i] <- betweenness_global[names(betweenness_global) == list_area[i]] * 100000
-      labels_area$closeness[i] <- closeness_global[names(closeness_global) == list_area[i]] * 10
+      labels_area$betweenness[i] <- betweenness_global[names(betweenness_global) == list_area[i]] / 1000
+      labels_area$closeness_all[i] <- closeness_global_all[names(closeness_global_all) == list_area[i]] * 1000
+      labels_area$closeness_in[i] <- closeness_global_in[names(closeness_global_in) == list_area[i]] * 1000
+      labels_area$closeness_out[i] <- closeness_global_out[names(closeness_global_out) == list_area[i]] * 1000
     }
   }else if(scale == "LAD20CD"){
     print("OD data is at MSOA scale, using population weighted averages")
     for(i in 1:length(list_area)){
       ref <- unique(lu_area$MSOA11CD[lu_area$LAD20CD == list_area[i]])
       betw <- rep(NA,length(ref))
-      clos <- rep(NA,length(ref))
+      clos_all <- rep(NA,length(ref))
+      clos_in <- rep(NA,length(ref))
+      clos_out <- rep(NA,length(ref))
       pops <- rep(NA,length(ref))
       for(j in 1:length(ref)){
-        betw[j] <- betweenness_global[names(betweenness_global) == ref[j]] * 100000
-        clos[j] <- closeness_global[names(closeness_global) == ref[j]] * 10
+        betw[j] <- betweenness_global[names(betweenness_global) == ref[j]] / 1000
+        clos_all[j] <- closeness_global_all[names(closeness_global_all) == ref[j]] * 1000
+        clos_in[j] <- closeness_global_in[names(closeness_global_in) == ref[j]] * 1000
+        clos_out[j] <- closeness_global_out[names(closeness_global_out) == ref[j]] * 1000
         pops[j] <- sum(lu_area$pop[lu_area$MSOA11CD == ref[j]])
       }
       labels_area$betweenness[i] <- sum(betw * pops) / sum(pops)
-      labels_area$closeness[i] <- sum(clos * pops) / sum(pops)
+      labels_area$closeness_all[i] <- sum(clos_all * pops) / sum(pops)
+      labels_area$closeness_in[i] <- sum(clos_in * pops) / sum(pops)
+      labels_area$closeness_out[i] <- sum(clos_out * pops) / sum(pops)
     }
   }
   # Median age
@@ -388,10 +410,10 @@ plotSHAP <- function(resSHAP, folderOut, fplot){
   resKurt <- resSHAP[[4]]
   info <- resSHAP[[5]]
   ### Plot means
-  avg1 <- colSums(resMean[,2:7])/nrow(resMean)
-  avg2 <- colSums(resSd[,2:7])/nrow(resSd)
-  avg3 <- colSums(resSkew[,2:7])/nrow(resSkew)
-  avg4 <- colSums(resKurt[,2:7])/nrow(resKurt)
+  avg1 <- colSums(resMean[,2:ncol(resMean)])/nrow(resMean)
+  avg2 <- colSums(resSd[,2:ncol(resSd)])/nrow(resSd)
+  avg3 <- colSums(resSkew[,2:ncol(resSkew)])/nrow(resSkew)
+  avg4 <- colSums(resKurt[,2:ncol(resKurt)])/nrow(resKurt)
   res <- rbind(avg1,avg2,avg3,avg4)
   row.names(res) <- c("Mean", "Sd", "Skewness", "Kurotsis")
   res <- t(res)
@@ -407,7 +429,7 @@ plotSHAP <- function(resSHAP, folderOut, fplot){
   row.names(res2) <- c("Mean", "Sd", "Skewness", "Kurotsis")
   res2 <- t(res2)
   #
-  png(file=file.path(folderOut,fplot,paste(info[1], info[2], info[3], info[4], "feature_importance.png", sep = "-")), width=1250, height=625)
+  png(file=file.path(folderOut,fplot,paste(info[1], info[2], info[3], info[4], "feature_importance.png", sep = "-")), width=1250, height=1000)
   par(mfrow = c(1,2))
   image(1:ncol(res), 1:nrow(res), t(res), axes = FALSE, col = hcl.colors(12, "Plasma", rev = TRUE),
         main = paste(info[1], info[2], info[3], info[4], "; average importance", sep = " "))
@@ -428,31 +450,25 @@ ggplotSHAP2 <- function(resSHAP, folderOut, fplot){
   resKurt <- resSHAP[[4]]
   info <- resSHAP[[5]]
   ### Plot means
-  avg1 <- colSums(resMean[,2:7])/nrow(resMean)
-  avg2 <- colSums(resSd[,2:7])/nrow(resSd)
-  avg3 <- colSums(resSkew[,2:7])/nrow(resSkew)
-  avg4 <- colSums(resKurt[,2:7])/nrow(resKurt)
+  avg1 <- colSums(resMean[,2:ncol(resMean)])/nrow(resMean)
+  avg2 <- colSums(resSd[,2:ncol(resSd)])/nrow(resSd)
+  avg3 <- colSums(resSkew[,2:ncol(resSkew)])/nrow(resSkew)
+  avg4 <- colSums(resKurt[,2:ncol(resKurt)])/nrow(resKurt)
   res <- rbind(avg1,avg2,avg3,avg4)
   row.names(res) <- c("Mean", "Sd", "Skewness", "Kurotsis")
-  res <- t(res)
+  res1 <- t(res)
   ### Plot means norm by moment column
-  avg11 <- colSums(resMean[,2:ncol(resMean)])/nrow(resMean)
-  avg21 <- colSums(resSd[,2:ncol(resSd)])/nrow(resSd)
-  avg31 <- colSums(resSkew[,2:ncol(resSkew)])/nrow(resSkew)
-  avg41 <- colSums(resKurt[,2:ncol(resKurt)])/nrow(resKurt)
-  res2 <- rbind(avg11,avg21,avg31,avg41)
+  res2 <- res1
   for(i in 1:4){
     res2[,i] <- res2[,i]/max(res2[,i])
   }
-  row.names(res2) <- c("Mean", "Sd", "Skewness", "Kurotsis")
-  res2 <- t(res2)
   #
-  png(file=file.path(folderOut,fplot,paste(info[1], info[2], info[3], info[4], "feature_importance_gg.png", sep = "-")), width=1250, height=625)
+  png(file=file.path(folderOut,fplot,paste(info[1], info[2], info[3], info[4], "feature_importance_gg.png", sep = "-")), width=1250, height=1000)
   par(mfrow = c(1,2))
-  image(1:ncol(res), 1:nrow(res), t(res), axes = FALSE, col = hcl.colors(7, "Blue-Red", rev = TRUE),
+  image(1:ncol(res1), 1:nrow(res1), t(res1), axes = FALSE, col = hcl.colors(7, "Blue-Red", rev = TRUE),
         main = paste(info[1], info[2], info[3], info[4], "; average importance", sep = " "))
-  axis(1, 1:ncol(res), colnames(res))
-  axis(2, 1:nrow(res), rownames(res))
+  axis(1, 1:ncol(res1), colnames(res1))
+  axis(2, 1:nrow(res1), rownames(res1))
   image(1:ncol(res2), 1:nrow(res2), t(res2), axes = FALSE, col = hcl.colors(7, "Blue-Red", rev = TRUE),
         main = paste(info[1], info[2], info[3], info[4], "; average importance norm. p. column", sep = " "))
   axis(1, 1:ncol(res2), colnames(res2))
