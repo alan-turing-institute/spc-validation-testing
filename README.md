@@ -23,7 +23,7 @@ Explanatory variables included:
 | closeness_in | Closeness centrality measure | [nomis](https://www.nomisweb.co.uk/census/2011/wf01bew) | OA | Inwards directed closeness centrality weighted by (inverted) flow volumes from commuting data |
 | closeness_out | Closeness centrality measure | [nomis](https://www.nomisweb.co.uk/census/2011/wf01bew) | OA | Outwards directed closeness centrality weighted by (inverted) flow volumes from commuting data |
 
-Scale refers to the base scale in the raw data; gets aggregated when requested by user. 
+Scale refers to the base scale in the raw data; gets aggregated when requested by user. IMD19 ranks and scores are aggregated by population weighted averaging; for centrality measures, flows inside the commuting networks are merged.
 
 ## Method 2: Clustering intersection approach
 
