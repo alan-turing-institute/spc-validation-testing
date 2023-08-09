@@ -1,6 +1,5 @@
 ### TO DO:
 #   Refine distance to nearest HPD area
-#   Do better than deprivation rank?
 
 
 ##############################
@@ -55,7 +54,14 @@ downloadPrerequisites <- function(folderIn,fdl){
     download.file(url = url, destfile = file.path(folderIn,fdl,"deprivation.xlsx"))
     n <- n+1
   }
-  print(paste("Downloaded", n, "new files, skipped", 4-n, "files that already exist", sep = " "))
+  # Deprivation scores
+  if(!(file.exists(file.path(folderIn,fdl,"deprivation_scores.xlsx")))){
+    print("Downloading deprivation scores from gov.uk...")
+    url <- "https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/833978/File_5_-_IoD2019_Scores.xlsx"
+    download.file(url = url, destfile = file.path(folderIn,fdl,"deprivation_scores.xlsx"))
+    n <- n+1
+  }
+  print(paste("Downloaded", n, "new files, skipped", 5-n, "files that already exist", sep = " "))
 }
 
 ######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
@@ -163,9 +169,10 @@ loadPrerequisites <- function(folderIn,fdl,scale = c("LSOA11CD", "MSOA11CD")){
   }
   lsoa_areas <- lsoa_areas / 1000000
   assign("popArea_lsoa_global", data.frame(LSOA11CD = lsoa_names, pop = lsoa_pop, area = lsoa_areas), envir = globalenv())
-  # Deprivation index
+  # Deprivation indices
   assign("depriv_global", read_excel(file.path(folderIn,fdl,"deprivation.xlsx"), sheet = 2), envir = globalenv())
-  print("Done! Loaded lu, betweenness_global, closeness_global, popArea_lsoa_global, depriv_global into the global environment")
+  assign("depriv_scores_global", read_excel(file.path(folderIn,fdl,"deprivation_scores.xlsx"), sheet = 2), envir = globalenv())
+  print("Done! Loaded lu, betweenness_global, closeness_global, popArea_lsoa_global, depriv_global, depriv_scores_global into the global environment")
 }
 
 # area_name and date must point to one of the .csv files on Azure
@@ -182,7 +189,7 @@ loadArea <- function(name,date,folderIn,farea,country = "England"){
 
 # area_name and date must point to one of the .csv files on Azure
 # Min scale is LSOA due to source control data
-# Taken from global environment: folderIn, farea, lu, betweenness_global, closeness_global, popArea_lsoa_global, depriv_global
+# Taken from global environment: folderIn, farea, lu, betweenness_global, closeness_global_all, closeness_global_in, closeness_global_out, popArea_lsoa_global, depriv_global, depriv_scores_global
 prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), data = NULL){
   # Load and trim Azure file (needed for median age)
   if(is.null(data)){
@@ -198,7 +205,7 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
   list_area <- unique(lu_area[,scale])
   #
   labels_area <- data.frame(area = list_area, closeness_all = NA, closeness_in = NA, closeness_out = NA, betweenness = NA, distHPD = NA,
-                            popDens = NA, medAge = NA, deprivation = NA)
+                            popDens = NA, medAge = NA, IMD19_ranks = NA, IMD19_scores = NA)
   colnames(labels_area)[1] <- scale
   # Centrality
   if(scale == "MSOA11CD" | scale == "LSOA11CD"){
@@ -254,11 +261,14 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
     lsoas <- unique(lu$LSOA11CD[lu[,scale] == list_area[i]])
     pops <- rep(NA, length(lsoas))
     deprivs <- rep(NA,length(lsoas))
+    deprivs_scores <- rep(NA,length(lsoas))
     for(j in 1:length(lsoas)){
       deprivs[j] <- depriv_global$`Index of Multiple Deprivation (IMD) Rank`[depriv_global$`LSOA code (2011)` == lsoas[j]]
+      deprivs_scores[j] <- max(depriv_scores_global$`Index of Multiple Deprivation (IMD) Score`) - depriv_scores_global$`Index of Multiple Deprivation (IMD) Score`[depriv_scores_global$`LSOA code (2011)` == lsoas[j]]
       pops[j] <- lu_area$pop[lu_area$LSOA11CD == lsoas[j]]
     }
-    labels_area$deprivation[i] <- sum(deprivs * pops) / sum(pops)
+    labels_area$IMD19_ranks[i] <- sum(deprivs * pops) / sum(pops)
+    labels_area$IMD19_scores[i] <- sum(deprivs_scores * pops) / sum(pops)
   }
   write.table(labels_area,file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")),sep = ",",row.names = F)
   print(paste("Done! Saved labels to",file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")),sep = " "))
