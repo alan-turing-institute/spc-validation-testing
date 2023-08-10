@@ -1,7 +1,3 @@
-### TO DO:
-#   Refine distance to nearest HPD area
-
-
 ##############################
 ##############################
 ####### Make test data #######
@@ -141,6 +137,7 @@ loadPrerequisites <- function(folderIn,fdl,scale = c("LSOA11CD", "MSOA11CD")){
     }
     OD_net <- graph_from_adjacency_matrix(OD_wide_prep, mode = "directed", weighted = TRUE, diag = TRUE)
     edge_attr(OD_net, "weight") <- 1/edge_attr(OD_net, "weight")
+    assign("OD_net_global",OD_net, envir = globalenv())
     print("Calculating betweenness centrality, this can take several minutes...")
     betw <- betweenness(OD_net,directed = TRUE, normalized = FALSE)
     assign("betweenness_global", betw, envir = globalenv())
@@ -172,7 +169,7 @@ loadPrerequisites <- function(folderIn,fdl,scale = c("LSOA11CD", "MSOA11CD")){
   # Deprivation indices
   assign("depriv_global", read_excel(file.path(folderIn,fdl,"deprivation.xlsx"), sheet = 2), envir = globalenv())
   assign("depriv_scores_global", read_excel(file.path(folderIn,fdl,"deprivation_scores.xlsx"), sheet = 2), envir = globalenv())
-  print("Done! Loaded lu, betweenness_global, closeness_global, popArea_lsoa_global, depriv_global, depriv_scores_global into the global environment")
+  print("Done! Loaded lu, betweenness_global, closeness_global, OD_net_global, popArea_lsoa_global, depriv_global, depriv_scores_global into the global environment")
 }
 
 # area_name and date must point to one of the .csv files on Azure
@@ -189,7 +186,7 @@ loadArea <- function(name,date,folderIn,farea,country = "England"){
 
 # area_name and date must point to one of the .csv files on Azure
 # Min scale is LSOA due to source control data
-# Taken from global environment: folderIn, farea, lu, betweenness_global, closeness_global_all, closeness_global_in, closeness_global_out, popArea_lsoa_global, depriv_global, depriv_scores_global
+# Taken from global environment: folderIn, farea, lu, betweenness_global, closeness_global_all, closeness_global_in, closeness_global_out, OD_net_global, popArea_lsoa_global, depriv_global, depriv_scores_global
 prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), data = NULL){
   # Load and trim Azure file (needed for median age)
   if(is.null(data)){
@@ -246,13 +243,31 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
     ref <- lu_area$LSOA11CD[lu_area[,scale] == list_area[i]]
     labels_area$popDens[i] <- sum(lu_area$pop[lu_area$LSOA %in% ref]) / sum(lu_area$area[lu_area$LSOA %in% ref])
   }
-  x_ref <- mean(data$lng[data[,scale] == labels_area[which.max(labels_area$popDens),scale]])
-  y_ref <- mean(data$lat[data[,scale] == labels_area[which.max(labels_area$popDens),scale]])
-  for(i in 1:length(list_area)){
-    x <- mean(data$lng[data[,scale] == labels_area[i,scale]])
-    y <- mean(data$lat[data[,scale] == labels_area[i,scale]])
-    labels_area$distHPD[i] <- distHaversine(c(x_ref,y_ref),c(x,y))
+  OD_net2 <- subgraph(OD_net_global, labels_area$MSOA11CD)
+  if(!all(V(OD_net2)$name == labels_area$MSOA11CD[order(labels_area$MSOA11CD)])){
+    stop("Area lists not matching between network and labels")
   }
+  V(OD_net2)$popDens <- labels_area$popDens[order(labels_area$MSOA11CD)]
+  V(OD_net2)$lng <- NA
+  V(OD_net2)$lat <- NA
+  loc_max <- NULL
+  for(i in 1:length(V(OD_net2))){
+    V(OD_net2)$lng[i] <- mean(data$lng[data[,scale] == V(OD_net2)$name[i]])
+    V(OD_net2)$lat[i] <- mean(data$lat[data[,scale] == V(OD_net2)$name[i]])
+    if(V(OD_net2)$popDens[i] == max(V(OD_net2)$popDens[neighbors(OD_net2, V(OD_net2)[i], mode = "in")])){
+      loc_max <- c(loc_max,V(OD_net2)[i])
+    }
+  }
+  el <- get.edgelist(OD_net2, names=FALSE)
+  E(OD_net2)$weight <- sapply(1:length(E(OD_net2)),function(i){distHaversine(c(V(OD_net2)$lng[el[i,1]],V(OD_net2)$lat[el[i,1]]),c(V(OD_net2)$lng[el[i,2]],V(OD_net2)$lat[el[i,2]]))})
+  comps <- components(OD_net2, mode = "weak")
+  distT <- rep(NA,length(V(OD_net2)))
+  for(i in 1:length(V(OD_net2))){
+    comp <- comps$membership[V(OD_net2)[i]]
+    maxs <- loc_max[comps$membership[loc_max] == comp]
+    distT[i] <- sum(distances(OD_net2,V(OD_net2)[i],maxs,mode = "all"))
+  }
+  labels_area$distHPD[order(labels_area$MSOA11CD)] <- distT
   # Deprivation
   if(scale != "LSOA11CD"){
     print("Deprivation data is at LSOA scale, using population weighted averages")
