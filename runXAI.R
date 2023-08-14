@@ -68,10 +68,11 @@ preds <- prepareLabels("west-yorkshire", 2020, "MSOA11CD")
 # createCentrality(folderIn,fproc,"LSOA11CD")
 # or loadPrerequisites(folderIn,fdl,fproc,"LSOA11CD")
 
-# It is also possible to pre-load an area, e.g.:
+# It is also possible to pre-load an area and/or load the prerequisites only once to the global environment, e.g.:
+# loadPrerequisites(folderIn,fdl,fproc,"LSOA11CD")
 # dataWY <- loadArea("west-yorkshire",2020,folderIn,farea)
 # Then call the function as
-# prepareLabels("west-yorkshire", 2020, "MSOA11CD", data = dataWY)
+# prepareLabels("west-yorkshire", 2020, "MSOA11CD", data = dataWY, skipLoad = TRUE)
 
 # Note that the following will be saved to the global environment, so that the raw data can be checked easily: 
 #   lu, betweenness_global, closeness_global_all, closeness_global_in, closeness_global_out, OD_net_global, popArea_lsoa_global, depriv_global, depriv_scores_global

@@ -211,13 +211,15 @@ loadArea <- function(name,date,folderIn,farea,country = "England"){
 # area_name and date must point to one of the .csv files on Azure
 # Min scale is LSOA due to source control data
 # Taken from global environment: folderIn, farea, lu, betweenness_global, closeness_global_all, closeness_global_in, closeness_global_out, OD_net_global, popArea_lsoa_global, depriv_global, depriv_scores_global
-prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), folderIn = folderIn, fdl = fdl, fproc = fproc, data = NULL){
+prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), folderIn = folderIn, fdl = fdl, fproc = fproc, data = NULL, skipLoad = FALSE){
   scale <- match.arg(scale)
   print("Loading required data, this will overwrite the global environment in case of conflicts...")
-  if(scale == "LAD20CD"){
-    loadPrerequisites(folderIn,fdl,fproc,"MSOA11CD")
-  }else{
-    loadPrerequisites(folderIn,fdl,fproc,scale)
+  if(skipLoad == FALSE){
+    if(scale == "LAD20CD"){
+      loadPrerequisites(folderIn,fdl,fproc,"MSOA11CD")
+    }else{
+      loadPrerequisites(folderIn,fdl,fproc,scale)
+    }
   }
   # Load and trim Azure file (needed for median age)
   if(is.null(data)){
