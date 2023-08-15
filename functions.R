@@ -76,7 +76,6 @@ downloadPrerequisites <- function(folderIn,fdl){
 #betweenness(n,directed = TRUE, normalized = FALSE)
 ######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
 
-createCentrality(folderIn,fproc,scale = "LSOA11CD")
 
 createOD <- function(folderIn,fdl,fproc,scale = c("LSOA11CD", "MSOA11CD")){
   scale = match.arg(scale)
@@ -121,10 +120,12 @@ createCentrality <- function(folderIn,fproc,scale = c("LSOA11CD", "MSOA11CD")){
     names(clos_all) <- clos$area
     names(clos_in) <- clos$area
     names(clos_out) <- clos$area
+    OD_net <- read_graph(paste(folderIn,"/",fproc,"/","OD_net_",scale,".txt",sep = ""), format = "pajek")
     assign("betweenness_global", betw, envir = globalenv())
     assign("closeness_global_all", clos_all, envir = globalenv())
     assign("closeness_global_in", clos_in, envir = globalenv())
     assign("closeness_global_out", clos_out, envir = globalenv())
+    assign("OD_net_global",OD_net, envir = globalenv())
   }else{
     OD <- createOD(folderIn,fdl,fproc,scale)
     if(length(grep("E",unique(lu[,scale]))) +  length(grep("W",unique(lu[,scale]))) > length(unique(OD$Home))){
@@ -147,7 +148,9 @@ createCentrality <- function(folderIn,fproc,scale = c("LSOA11CD", "MSOA11CD")){
     }
     OD_net <- graph_from_adjacency_matrix(OD_wide_prep, mode = "directed", weighted = TRUE, diag = TRUE)
     edge_attr(OD_net, "weight") <- 1/edge_attr(OD_net, "weight")
-    print("Writing network to the global environment...")
+    print("Writing network to the global environment and creating a save file...")
+    V(OD_net)$id <- as.character(V(OD_net)$name)
+    write_graph(OD_net, file = paste(folderIn,"/",fproc,"/","OD_net_",scale,".txt",sep = ""), format = "pajek")
     assign("OD_net_global",OD_net, envir = globalenv())
     print("Calculating betweenness centrality, this can take several minutes...")
     betw <- betweenness(OD_net,directed = TRUE, normalized = FALSE)
@@ -193,7 +196,7 @@ loadPrerequisites <- function(folderIn,fdl,fproc,scale = c("LSOA11CD", "MSOA11CD
   # Deprivation indices
   assign("depriv_global", read_excel(file.path(folderIn,fdl,"deprivation.xlsx"), sheet = 2), envir = globalenv())
   assign("depriv_scores_global", read_excel(file.path(folderIn,fdl,"deprivation_scores.xlsx"), sheet = 2), envir = globalenv())
-  print("Done! Loaded lu, betweenness_global, closeness_global, OD_net_global, popArea_lsoa_global, depriv_global, depriv_scores_global into the global environment")
+  print("Done! Loaded lu, betweenness_global, closeness_global_all, closeness_global_in, closeness_global_out, OD_net_global, popArea_lsoa_global, depriv_global, depriv_scores_global into the global environment")
 }
 
 # area_name and date must point to one of the .csv files on Azure
@@ -211,7 +214,7 @@ loadArea <- function(name,date,folderIn,farea,country = "England"){
 # area_name and date must point to one of the .csv files on Azure
 # Min scale is LSOA due to source control data
 # Taken from global environment: folderIn, farea, lu, betweenness_global, closeness_global_all, closeness_global_in, closeness_global_out, OD_net_global, popArea_lsoa_global, depriv_global, depriv_scores_global
-prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), folderIn = folderIn, fdl = fdl, fproc = fproc, data = NULL, skipLoad = FALSE){
+prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), folderIn, fdl, fproc, data = NULL, skipLoad = FALSE){
   scale <- match.arg(scale)
   print("Loading required data, this will overwrite the global environment in case of conflicts...")
   if(skipLoad == FALSE){
@@ -239,10 +242,10 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
   # Centrality
   if(scale == "MSOA11CD" | scale == "LSOA11CD"){
     for(i in 1:length(list_area)){
-      labels_area$betweenness[i] <- betweenness_global[names(betweenness_global) == list_area[i]] / 1000
-      labels_area$closeness_all[i] <- closeness_global_all[names(closeness_global_all) == list_area[i]] * 1000
-      labels_area$closeness_in[i] <- closeness_global_in[names(closeness_global_in) == list_area[i]] * 1000
-      labels_area$closeness_out[i] <- closeness_global_out[names(closeness_global_out) == list_area[i]] * 1000
+      labels_area$betweenness[i] <- betweenness_global[names(betweenness_global) == list_area[i]] / mean(betweenness_global)
+      labels_area$closeness_all[i] <- closeness_global_all[names(closeness_global_all) == list_area[i]] / mean(closeness_global_all)
+      labels_area$closeness_in[i] <- closeness_global_in[names(closeness_global_in) == list_area[i]] / mean(closeness_global_in)
+      labels_area$closeness_out[i] <- closeness_global_out[names(closeness_global_out) == list_area[i]] / mean(closeness_global_out)
     }
   }else if(scale == "LAD20CD"){
     print("Centrality data loaded at MSOA scale, using population weighted averages")
@@ -254,10 +257,10 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
       clos_out <- rep(NA,length(ref))
       pops <- rep(NA,length(ref))
       for(j in 1:length(ref)){
-        betw[j] <- betweenness_global[names(betweenness_global) == ref[j]] / 1000
-        clos_all[j] <- closeness_global_all[names(closeness_global_all) == ref[j]] * 1000
-        clos_in[j] <- closeness_global_in[names(closeness_global_in) == ref[j]] * 1000
-        clos_out[j] <- closeness_global_out[names(closeness_global_out) == ref[j]] * 1000
+        betw[j] <- betweenness_global[names(betweenness_global) == ref[j]] / mean(betweenness_global)
+        clos_all[j] <- closeness_global_all[names(closeness_global_all) == ref[j]] / mean(closeness_global_all)
+        clos_in[j] <- closeness_global_in[names(closeness_global_in) == ref[j]] / mean(closeness_global_in)
+        clos_out[j] <- closeness_global_out[names(closeness_global_out) == ref[j]] / mean(closeness_global_out)
         pops[j] <- sum(lu_area$pop[lu_area$MSOA11CD == ref[j]])
       }
       labels_area$betweenness[i] <- sum(betw * pops) / sum(pops)
@@ -353,7 +356,7 @@ loadLabels <- function(area_name,date, scale){
     ret <- read.csv(file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")))
     return(ret)
   }else{
-    print(paste("File",file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")),"is missing",sep = " "))
+    stop(paste("File",file.path(folderOut,paste("labels_",area_name,"_",date,"_",scale,".csv",sep = "")),"is missing",sep = " "))
   }
 }
 
