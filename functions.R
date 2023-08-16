@@ -312,7 +312,7 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
   }
   for(i in 1:length(list_area)){
     lsoas <- unique(lu$LSOA11CD[lu[,scale] == list_area[i]])
-    pops <- rep(NA, length(lsoas))
+    pops <- rep(NA,length(lsoas))
     deprivs <- rep(NA,length(lsoas))
     deprivs_scores <- rep(NA,length(lsoas))
     for(j in 1:length(lsoas)){
@@ -375,7 +375,7 @@ findmoments <- function(dstrb, graph = TRUE){
 #date = 2020
 #variable_name = "incomeH"
 #aggregation = "mean"
-#ntrain = 2
+#ntrain = 20
 
 #data = dataWY
 #dataS <- data
@@ -390,8 +390,15 @@ findmoments <- function(dstrb, graph = TRUE){
 ######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
 
 # Taken from global environment: folderIn, farea, lu
-runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), variable_name, ntrain, data = NULL, predictors = NULL){
+runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), variable_name, ntrain, predNames = "all", data = NULL, predictors = NULL, seed = NULL){
   scale <- match.arg(scale)
+  # set seed
+  if(is.null(seed)){
+    seed <- floor(runif(5,10000000,99999999))[5]
+    set.seed(seed)
+  }else{
+    set.seed(seed)
+  }
   # Load and trim Azure file
   if(is.null(data)){
     data <- loadArea(area_name,date,folderIn,farea)
@@ -410,7 +417,11 @@ runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"),
   new_area_list <- unique(predictions[,scale])
   removed_area_NA <- setdiff(save_area_list, new_area_list)
   #
-  predictors <- predictors[complete.cases(predictors), ]
+  if(any(predNames != "all")){
+    predictors <- predictors[complete.cases(predictors),c(scale,predNames)]
+  }else{
+    predictors <- predictors[complete.cases(predictors), ]
+  }
   new_pred_list <- unique(predictors[,scale])
   removed_pred_NA <- setdiff(save_pred_list, new_pred_list)
   #
@@ -421,7 +432,7 @@ runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"),
   if(length(removed_area_NA) > 0){
     print(paste("Removed",removed_area_NA,"due to all", variable_name,"are NA inside the area", sep = " "))
   }
-  if(length(removed_area_NA) > 0){
+  if(length(removed_pred_NA) > 0){
     print(paste("Removed",removed_pred_NA,"due to some NA values within the predictors", sep = " "))
   }
   if(length(removed_dont_match) > 0){
@@ -463,8 +474,11 @@ runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"),
   model <- xgboost(data = x_train,label = y_train_kurt,nround = 20,verbose = FALSE)
   explainer <- shapr(x_train, model)
   explanation_kurt <- explain(x_test,approach = "empirical",explainer = explainer,prediction_zero = mean(y_train_kurt))
-  return(list(explanation_mean$dt,explanation_sd$dt,explanation_skew$dt,explanation_kurt$dt,c(area_name, date, scale, variable_name)))
+  return(list(explanation_mean$dt,explanation_sd$dt,explanation_skew$dt,explanation_kurt$dt,c(area_name, date, scale, variable_name, seed)))
 }
+
+sum(explanation_mean$dt[,9])
+colSums(explanation_mean$dt)
 
 plotSHAP <- function(resSHAP, folderOut, fplot){
   resMean <- resSHAP[[1]]
@@ -523,19 +537,22 @@ ggplotSHAP2 <- function(resSHAP, folderOut, fplot){
   ### Plot means norm by moment column
   res2 <- res1
   for(i in 1:4){
-    res2[,i] <- res2[,i]/max(res2[,i])
+    res2[,i] <- res2[,i]/max(abs(res2[,i]))
   }
+  i = 2
   #
-  png(file=file.path(folderOut,fplot,paste(info[1], info[2], info[3], info[4], "feature_importance_gg.png", sep = "-")), width=1250, height=1000)
+  max(abs(range(res1)))
+  png(file=file.path(folderOut,fplot,paste(info[1], info[2], info[3], info[4], info[5], "feature_importance_gg.png", sep = "-")), width=1250, height=1000)
   par(mfrow = c(1,2))
-  image(1:ncol(res1), 1:nrow(res1), t(res1), axes = FALSE, col = hcl.colors(7, "Blue-Red", rev = TRUE),
-        main = paste(info[1], info[2], info[3], info[4], "; average importance", sep = " "))
+  image(1:ncol(res1), 1:nrow(res1), t(res1), axes = FALSE, ylab ="", xlab = "", col = hcl.colors(11, "Blue-Red", rev = TRUE),
+        zlim = c(-max(abs(range(res1))),max(abs(range(res1)))), main = paste(info[1], info[2], info[3], info[4], "; average importance", sep = " "))
   axis(1, 1:ncol(res1), colnames(res1))
   axis(2, 1:nrow(res1), rownames(res1))
-  image(1:ncol(res2), 1:nrow(res2), t(res2), axes = FALSE, col = hcl.colors(7, "Blue-Red", rev = TRUE),
-        main = paste(info[1], info[2], info[3], info[4], "; average importance norm. p. column", sep = " "))
+  image(1:ncol(res2), 1:nrow(res2), t(res2), axes = FALSE, ylab ="", xlab = "", col = hcl.colors(11, "Blue-Red", rev = TRUE),
+        zlim = c(-max(abs(range(res2))),max(abs(range(res2)))), main = paste(info[1], info[2], info[3], info[4], "; average importance norm. p. column", sep = " "))
   axis(1, 1:ncol(res2), colnames(res2))
   axis(2, 1:nrow(res2), rownames(res2))
+  mtext(paste("seed: ",info[5]), side = 1, line=3, adj = 1)
   dev.off()
   print(paste("Plot saved in ", file.path(folderOut,fplot), "/", sep = ""))
 }
