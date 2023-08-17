@@ -181,7 +181,7 @@ loadPrerequisites <- function(folderIn,fdl,fproc,scale = c("LSOA11CD", "MSOA11CD
   # LSOA pop
   print("Loading the heavy geojson file...")
   lsoa_js <- FROM_GeoJson(url_file_string = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
-  print("Almost done...")
+  print("Progressing...")
   lsoa_feat <- lsoa_js$features
   lsoa_pop <- rep(NA,length(lsoa_feat))
   lsoa_names <- rep(NA,length(lsoa_feat))
@@ -196,7 +196,7 @@ loadPrerequisites <- function(folderIn,fdl,fproc,scale = c("LSOA11CD", "MSOA11CD
   # Deprivation indices
   assign("depriv_global", read_excel(file.path(folderIn,fdl,"deprivation.xlsx"), sheet = 2), envir = globalenv())
   assign("depriv_scores_global", read_excel(file.path(folderIn,fdl,"deprivation_scores.xlsx"), sheet = 2), envir = globalenv())
-  print("Done! Loaded lu, betweenness_global, closeness_global_all, closeness_global_in, closeness_global_out, OD_net_global, popArea_lsoa_global, depriv_global, depriv_scores_global into the global environment")
+  print("Loaded lu, betweenness_global, closeness_global_all, closeness_global_in, closeness_global_out, OD_net_global, popArea_lsoa_global, depriv_global, depriv_scores_global into the global environment")
 }
 
 # area_name and date must point to one of the .csv files on Azure
@@ -279,31 +279,54 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
     labels_area$popDens[i] <- sum(lu_area$pop[lu_area$LSOA %in% ref]) / sum(lu_area$area[lu_area$LSOA %in% ref])
   }
   if(scale == "LAD20CD"){
-    print("Warning (methods): Distances are computed from LAD centroid to MSOA centroid")
-  }
-  OD_net2 <- subgraph(OD_net_global, labels_area[,scale])
-  if(!all(V(OD_net2)$name == labels_area[order(labels_area[,scale]),scale])){
-    stop("Area lists not matching between network and labels")
-  }
-  V(OD_net2)$popDens <- labels_area$popDens[order(labels_area[,scale])]
-  V(OD_net2)$lng <- NA
-  V(OD_net2)$lat <- NA
-  loc_max <- NULL
-  for(i in 1:length(V(OD_net2))){
-    V(OD_net2)$lng[i] <- mean(data$lng[data[,scale] == V(OD_net2)$name[i]])
-    V(OD_net2)$lat[i] <- mean(data$lat[data[,scale] == V(OD_net2)$name[i]])
-    if(V(OD_net2)$popDens[i] == max(V(OD_net2)$popDens[neighbors(OD_net2, V(OD_net2)[i], mode = "in")])){
-      loc_max <- c(loc_max,V(OD_net2)[i])
+    print("Warning (methods): At LAD20CD scale, distances are computed directly from LAD centroid to MSOA centroid without using the commuting network.")
+    OD_net2 <- subgraph(OD_net_global, lu_area[,"MSOA11CD"])
+    for(i in 1:length(V(OD_net2))){
+      ref <- lu_area$LSOA11CD[lu_area[,"MSOA11CD"] == V(OD_net2)$name[i]]
+      V(OD_net2)$popDens[i] <- sum(lu_area$pop[lu_area$LSOA %in% ref]) / sum(lu_area$area[lu_area$LSOA %in% ref])
     }
-  }
-  el <- get.edgelist(OD_net2, names=FALSE)
-  E(OD_net2)$weight <- sapply(1:length(E(OD_net2)),function(i){distHaversine(c(V(OD_net2)$lng[el[i,1]],V(OD_net2)$lat[el[i,1]]),c(V(OD_net2)$lng[el[i,2]],V(OD_net2)$lat[el[i,2]]))})
-  comps <- components(OD_net2, mode = "weak")
-  distT <- rep(NA,length(V(OD_net2)))
-  for(i in 1:length(V(OD_net2))){
-    comp <- comps$membership[V(OD_net2)[i]]
-    maxs <- loc_max[comps$membership[loc_max] == comp]
-    distT[i] <- sum(distances(OD_net2,V(OD_net2)[i],maxs,mode = "all"))
+    loc_max <- c(NA,NA)
+    for(i in 1:length(V(OD_net2))){
+      if(V(OD_net2)$popDens[i] == max(V(OD_net2)$popDens[neighbors(OD_net2, V(OD_net2)[i], mode = "in")])){
+        loc_max <- rbind(loc_max,c(mean(data$lng[data[,"MSOA11CD"] == V(OD_net2)$name[i]]),mean(data$lat[data[,"MSOA11CD"] == V(OD_net2)$name[i]])))
+      }
+    }
+    loc_max <- loc_max[2:nrow(loc_max),]
+    distT <- rep(NA,length(list_area))
+    for(i in 1:length(list_area)){
+      base <- c(mean(data$lng[data[,"LAD20CD"] == list_area[i]]),mean(data$lat[data[,"LAD20CD"] == list_area[i]]))
+      if(nrow(loc_max) > 1){
+        for(j in 1:(nrow(loc_max) - 1)){
+          base <- rbind(base,base)
+        }
+      }
+      distT[i] <- sum(distHaversine(loc_max,base))
+    }
+  }else{
+    OD_net2 <- subgraph(OD_net_global, labels_area[,scale])
+    V(OD_net2)$popDens <- labels_area$popDens[order(labels_area[,scale])]
+    V(OD_net2)$lng <- NA
+    V(OD_net2)$lat <- NA
+    loc_max <- NULL
+    for(i in 1:length(V(OD_net2))){
+      V(OD_net2)$lng[i] <- mean(data$lng[data[,scale] == V(OD_net2)$name[i]])
+      V(OD_net2)$lat[i] <- mean(data$lat[data[,scale] == V(OD_net2)$name[i]])
+      if(V(OD_net2)$popDens[i] == max(V(OD_net2)$popDens[neighbors(OD_net2, V(OD_net2)[i], mode = "in")])){
+        loc_max <- c(loc_max,V(OD_net2)[i])
+      }
+    }
+    if(!all(V(OD_net2)$name == labels_area[order(labels_area[,scale]),scale])){
+      stop("Area lists not matching between network and labels")
+    }
+    el <- get.edgelist(OD_net2, names=FALSE)
+    E(OD_net2)$weight <- sapply(1:length(E(OD_net2)),function(i){distHaversine(c(V(OD_net2)$lng[el[i,1]],V(OD_net2)$lat[el[i,1]]),c(V(OD_net2)$lng[el[i,2]],V(OD_net2)$lat[el[i,2]]))})
+    comps <- components(OD_net2, mode = "weak")
+    distT <- rep(NA,length(V(OD_net2)))
+    for(i in 1:length(V(OD_net2))){
+      comp <- comps$membership[V(OD_net2)[i]]
+      maxs <- loc_max[comps$membership[loc_max] == comp]
+      distT[i] <- sum(distances(OD_net2,V(OD_net2)[i],maxs,mode = "all"))
+    }
   }
   labels_area$distHPD[order(labels_area[,scale])] <- distT
   # Deprivation
@@ -477,9 +500,6 @@ runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"),
   return(list(explanation_mean$dt,explanation_sd$dt,explanation_skew$dt,explanation_kurt$dt,c(area_name, date, scale, variable_name, seed)))
 }
 
-sum(explanation_mean$dt[,9])
-colSums(explanation_mean$dt)
-
 plotSHAP <- function(resSHAP, folderOut, fplot){
   resMean <- resSHAP[[1]]
   resSd <- resSHAP[[2]]
@@ -550,6 +570,43 @@ ggplotSHAP2 <- function(resSHAP, folderOut, fplot){
   axis(2, 1:nrow(res1), rownames(res1))
   image(1:ncol(res2), 1:nrow(res2), t(res2), axes = FALSE, ylab ="", xlab = "", col = hcl.colors(11, "Blue-Red", rev = TRUE),
         zlim = c(-max(abs(range(res2))),max(abs(range(res2)))), main = paste(info[1], info[2], info[3], info[4], "; average importance norm. p. column", sep = " "))
+  axis(1, 1:ncol(res2), colnames(res2))
+  axis(2, 1:nrow(res2), rownames(res2))
+  mtext(paste("seed: ",info[5]), side = 1, line=3, adj = 1)
+  dev.off()
+  print(paste("Plot saved in ", file.path(folderOut,fplot), "/", sep = ""))
+}
+
+ggplotSHAP3 <- function(resSHAP, folderOut, fplot){
+  resMean <- resSHAP[[1]]
+  resSd <- resSHAP[[2]]
+  resSkew <- resSHAP[[3]]
+  resKurt <- resSHAP[[4]]
+  info <- resSHAP[[5]]
+  ### Plot means
+  avg1 <- colSums(abs(resMean[,2:ncol(resMean)]))/nrow(resMean)
+  avg2 <- colSums(abs(resSd[,2:ncol(resSd)]))/nrow(resSd)
+  avg3 <- colSums(abs(resSkew[,2:ncol(resSkew)]))/nrow(resSkew)
+  avg4 <- colSums(abs(resKurt[,2:ncol(resKurt)]))/nrow(resKurt)
+  res <- rbind(avg1,avg2,avg3,avg4)
+  row.names(res) <- c("Mean", "Sd", "Skewness", "Kurotsis")
+  res1 <- t(res)
+  ### Plot means norm by moment column
+  res2 <- res1
+  for(i in 1:4){
+    res2[,i] <- res2[,i]/max(abs(res2[,i]))
+  }
+  i = 2
+  #
+  max(abs(range(res1)))
+  png(file=file.path(folderOut,fplot,paste(info[1], info[2], info[3], info[4], info[5], "feature_importance_gg_abs.png", sep = "-")), width=1250, height=1000)
+  par(mfrow = c(1,2))
+  image(1:ncol(res1), 1:nrow(res1), t(res1), axes = FALSE, ylab ="", xlab = "", col = hcl.colors(11, "Blue-Red", rev = TRUE),
+        zlim = c(0,max(abs(range(res1)))), main = paste(info[1], info[2], info[3], info[4], "; average importance", sep = " "))
+  axis(1, 1:ncol(res1), colnames(res1))
+  axis(2, 1:nrow(res1), rownames(res1))
+  image(1:ncol(res2), 1:nrow(res2), t(res2), axes = FALSE, ylab ="", xlab = "", col = hcl.colors(11, "Blue-Red", rev = TRUE),
+        zlim = c(0,max(abs(range(res2)))), main = paste(info[1], info[2], info[3], info[4], "; average importance norm. p. column", sep = " "))
   axis(1, 1:ncol(res2), colnames(res2))
   axis(2, 1:nrow(res2), rownames(res2))
   mtext(paste("seed: ",info[5]), side = 1, line=3, adj = 1)

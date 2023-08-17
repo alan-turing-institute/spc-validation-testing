@@ -71,7 +71,7 @@ downloadPrerequisites(folderIn,fdl)
 #               skipLoad = FALSE
 #               )
 
-preds <- prepareLabels("west-yorkshire", 2020, "MSOA11CD", folderIn, fdl, fproc)
+preds <- prepareLabels("west-yorkshire", 2020, "LAD20CD", folderIn, fdl, fproc)
 
 # The first analysis at LSOA scale can be very slow, since all the data must first be prepped and saved once at that scale.
 # The long bits can be done directly by running:
@@ -153,6 +153,7 @@ test <- runSHAP("west-yorkshire", 2020, "MSOA11CD", "incomeH", 60, predNames = c
 ggplotSHAP2(test, folderOut, file.path(fplot))
 test[[5]]
 
+ggplotSHAP3(test, folderOut, file.path(fplot))
 
 for(i in 1:20){
   test <- testSHAP(8)
