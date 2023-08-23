@@ -236,7 +236,7 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
   lu_area <- merge(lu_area, popArea_lsoa_global, by.x = "LSOA11CD", by.y = "LSOA11CD", all.x = T)
   list_area <- unique(lu_area[,scale])
   #
-  labels_area <- data.frame(area = list_area, closeness_all = NA, closeness_in = NA, closeness_out = NA, betweenness = NA, distHPD = NA,
+  labels_area <- data.frame(area = list_area, closeness_all = NA, closeness_in = NA, closeness_out = NA, betweenness = NA, distHPD = NA, distAllHPD = NA,
                             popDens = NA, medAge = NA, IMD19_ranks = NA, IMD19_scores = NA)
   colnames(labels_area)[1] <- scale
   # Centrality
@@ -293,6 +293,7 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
     }
     loc_max <- loc_max[2:nrow(loc_max),]
     distT <- rep(NA,length(list_area))
+    distT2 <- rep(NA,length(list_area))
     for(i in 1:length(list_area)){
       base <- c(mean(data$lng[data[,"LAD20CD"] == list_area[i]]),mean(data$lat[data[,"LAD20CD"] == list_area[i]]))
       if(nrow(loc_max) > 1){
@@ -301,6 +302,7 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
         }
       }
       distT[i] <- sum(distHaversine(loc_max,base))
+      distT2[i] <- min(distHaversine(loc_max,base))
     }
   }else{
     OD_net2 <- subgraph(OD_net_global, labels_area[,scale])
@@ -322,13 +324,16 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
     E(OD_net2)$weight <- sapply(1:length(E(OD_net2)),function(i){distHaversine(c(V(OD_net2)$lng[el[i,1]],V(OD_net2)$lat[el[i,1]]),c(V(OD_net2)$lng[el[i,2]],V(OD_net2)$lat[el[i,2]]))})
     comps <- components(OD_net2, mode = "weak")
     distT <- rep(NA,length(V(OD_net2)))
+    distT2 <- rep(NA,length(V(OD_net2)))
     for(i in 1:length(V(OD_net2))){
       comp <- comps$membership[V(OD_net2)[i]]
       maxs <- loc_max[comps$membership[loc_max] == comp]
       distT[i] <- sum(distances(OD_net2,V(OD_net2)[i],maxs,mode = "all"))
+      distT2[i] <- min(distances(OD_net2,V(OD_net2)[i],maxs,mode = "all"))
     }
   }
-  labels_area$distHPD[order(labels_area[,scale])] <- distT
+  labels_area$distAllHPD[order(labels_area[,scale])] <- distT
+  labels_area$distHPD[order(labels_area[,scale])] <- distT2
   # Deprivation
   if(scale != "LSOA11CD"){
     print("Deprivation data is at LSOA scale, using population weighted averages")
