@@ -66,7 +66,7 @@ downloadPrerequisites(folderIn,fdl)
 #               scale = c("LSOA11CD","MSOA11CD","LAD20CD"),
 #               folderIn,
 #               fdl,
-#               fproc
+#               fproc,
 #               data = NULL,
 #               skipLoad = FALSE
 #               )
