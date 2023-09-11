@@ -472,7 +472,7 @@ runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"),
   row.names(predictors) <- 1:nrow(predictors)
   # Get predictions (moments)
   print("Finished loading the data. Calculating predictions...")
-  moments <- data.frame(area = rep(NA,l), mean = NA, sd = NA, skewness = NA, kurtosis = NA)
+    moments <- data.frame(area = rep(NA,l), mean = NA, sd = NA, skewness = NA, kurtosis = NA)
   colnames(moments)[1] <- scale
   for(i in 1:l){
     ref <- which(predictions[,scale] %in% new_area_list[i])
@@ -618,3 +618,105 @@ ggplotSHAP3 <- function(resSHAP, folderOut, fplot){
   dev.off()
   print(paste("Plot saved in ", file.path(folderOut,fplot), "/", sep = ""))
 }
+
+#############################################
+#############################################
+####### Cluster intersection analysis #######
+#############################################
+#############################################
+
+
+# Formatting function
+formatFeat <- function(feat, normalised = FALSE, colNames = colnames(feat)[2:ncol(feat)]){
+  if(length(colNames) == 1){
+    featRes <- data.frame(temp = feat[,colNames])
+    colnames(featRes) <- colNames
+  }else{
+    featRes <- feat[,colNames]
+  }
+  if(normalised == TRUE){
+    for(i in 1:ncol(featRes)){
+      featRes[,i] <- featRes[,i]/max(featRes[,i])
+    }
+  }
+  rownames(featRes) <- feat[,1]
+  return(featRes)
+}
+
+# Sub-function
+interClust <- function(ccs,ccs2){
+  res <- matrix(NA,nrow = length(ccs), ncol = length(ccs2))
+  for(i in 1:length(ccs)){
+    res[i,] <- sapply(ccs2,function(x){length(which(ccs[[i]] %in% x))})
+  }
+  return(res)
+}
+
+# Results of intersection
+clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, format = FALSE, normalised = FALSE, colNames1 = colnames(feat1)[2:ncol(feat1)], colNames2 = colnames(feat2)[2:ncol(feat2)]){
+  if(format == TRUE){
+    feat1 <- formatFeat(feat1, normalised, colNames1)
+    feat2 <- formatFeat(feat2, normalised, colNames2)
+  }
+  #
+  dfeat1 <- dist(feat1)
+  clust1 <- hclust(dfeat1)
+  cut1 <- cutree(clust1, k = nclust)
+  ccs1 <- list(NULL)
+  for(i in 1:nclust){
+    ccs1[[i]] <- names(cut1[which(cut1 == i)])
+  }
+  #
+  dfeat2 <- dist(feat2)
+  clust2 <- hclust(dfeat2)
+  cut2 <- cutree(clust2, k = nclust2)
+  ccs2 <- list(NULL)
+  for(i in 1:nclust2){
+    ccs2[[i]] <- names(cut2[which(cut2 == i)])
+  }
+  #
+  res1 <- interClust(ccs1,ccs2)
+  name1 <- deparse(substitute(feat1))
+  name2 <- deparse(substitute(feat2))
+  colnames(res1) <- sapply(1:nclust,function(x){paste(name1,x,sep = ".")})
+  rownames(res1) <- sapply(1:nclust2,function(x){paste(name2,x,sep = ".")})
+  res2 <- res1
+  res3 <- res1
+  for(i in 1:nrow(testY)){
+    res2[i,] <- round(res2[i,]/rowSums(res2)[i] * 100,1)
+    res3[,i] <- round(res3[,i]/colSums(res3)[i] * 100,1)
+  }
+  return(list(res1,res2,res3))
+}
+
+### Build moments
+
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+# For testing
+#scale = "MSOA11CD"
+#variable_name <- "incomeH"
+#data <- dataWY
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+
+makeMoments <- function(data,scale = c("LSOA11CD","MSOA11CD","LAD20CD"),variable_name){
+  print("Loading look-up table...")
+  assign("lu", read.csv(file.path(folderIn,fdl,"lookUp-GB.csv")), envir = globalenv())
+  print("Merging with data...")
+  data2 <- merge(data,lu[,c("OA11CD","LSOA11CD","MSOA11CD","LAD20CD")], by.x = "OA11CD", by.y = "OA11CD", all.x = T)
+  print("Calculating moments...")
+  new_area_list <- unique(data2[,scale])
+  l <- length(new_area_list)
+  moments <- data.frame(area = rep(NA,l), mean = NA, sd = NA, skewness = NA, kurtosis = NA)
+  colnames(moments)[1] <- scale
+  for(i in 1:l){
+    ref <- which(data2[,scale] %in% new_area_list[i] & !is.na(data2[,variable_name]))
+    moments[i,1] <- new_area_list[i]
+    moments[i,2:5] <- findmoments(data2[ref,variable_name], graph = FALSE)
+  }
+  moments <- moments[order(moments[,scale]),]
+  row.names(moments) <- 1:nrow(moments)
+  print("Done")
+  return(moments)
+}
+
+

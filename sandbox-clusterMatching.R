@@ -9,6 +9,8 @@ i = 1
 
 test <- loadLabels(area_name,date, scale)
 
+colnames(test)
+
 head(test)
 x <- test[,2:ncol(test)]
 dx <- dist(x)
@@ -143,5 +145,69 @@ for(i in 1:ncol(testY)){
   testZ2[,i] <- round(testZ2[,i]/colSums(testZ2)[i] * 100,1)
 }
 testZ2
+
+
+
+#########
+#########
+######### Proper functions (see functions/Cluster intersection analysis)
+#########
+#########
+
+
+
+
+########################################
+##### Simple intersection approach #####
+########################################
+
+
+### Metrics for general cluster intersection 
+
+# Optional formatting function assuming data is in a "classic" data frame format
+# formatFeat(
+#            feat,
+#            normalised = FALSE,
+#            colNames = colnames(feat)[2:ncol(feat)]
+#            )
+
+test <- data.frame(name = letters[1:9], A = 1:9, B = 1:9)
+formatFeat(test)
+formatFeat(test, normalised = TRUE)
+formatFeat(test, colNames = "B")
+
+# Note that pre-processing options within the function are limited.
+# Features to be formatted as formatFeat results.
+# clustMatching(
+#               feat1,
+#               feat2,
+#               nclust,
+#               nclust2 = nclust,
+#               format = FALSE,
+#               normalised = FALSE,
+#               colNames1 = colnames(feat1)[2:ncol(feat1)],
+#               colNames2 = colnames(feat2)[2:ncol(feat2)]
+#               )
+
+head(dataWY)
+
+dataWY <- loadArea("west-yorkshire",2020,folderIn,farea)
+moments <- makeMoments(dataWY,"MSOA11CD","incomeH")
+momentsWY <- formatFeat(moments,normalised = TRUE)
+#
+labels <- loadLabels("west-yorkshire",2020, "MSOA11CD")
+labelsWY <- formatFeat(labels,normalised = TRUE,colNames = c("closeness_all","betweenness","distHPD","popDens","medAge","IMD19_ranks"))
+#
+test <- clustMatching(momentsWY, labelsWY, nclust = 4)
+
+
+####################################
+##### Cluster characterisation #####
+####################################
+
+
+###########################
+##### Purity approach #####
+###########################
 
 
