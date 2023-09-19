@@ -1,6 +1,7 @@
 ### Cluster matching
 
 library(scales)
+library(funtimes)
 
 area_name <- "west-yorkshire"
 date <- 2020
@@ -189,8 +190,6 @@ formatFeat(test, colNames = "B")
 #               colNames2 = colnames(feat2)[2:ncol(feat2)]
 #               )
 
-head(dataWY)
-
 dataWY <- loadArea("west-yorkshire",2020,folderIn,farea)
 moments <- makeMoments(dataWY,"MSOA11CD","incomeH")
 momentsWY <- formatFeat(moments,normalised = TRUE)
@@ -205,9 +204,52 @@ test <- clustMatching(momentsWY, labelsWY, nclust = 4)
 ##### Cluster characterisation #####
 ####################################
 
+# Isolate cluster to be plotted
+# extractCluster(
+#                feat,
+#                nclust,
+#                format = FALSE,
+#                normalised = FALSE,
+#                colNames = colnames(feat)[2:ncol(feat)]
+#                )
+
+test <- extractCluster(momentsWY, nclust = 4)
+
+# Scatterplot of cluster content
+# clusterCarac(
+#              cluster,
+#              folderOut,
+#              fplot,
+#              title = NA,
+#              breaks = 10
+#              )
+
+# Density distributionn of chosen c=variable for each cluster  
+# clusterCaracFeature(cluster,
+#                     folderOut,
+#                     fplot,
+#                     data,
+#                     variable_name,
+#                     scale,
+#                     title = NA,
+#                     skip = 0,
+#                     breaks = 10,
+#                     height = "find",
+#                     res = 400
+#                     )
+    
+clusterCarac(test, folderOut, fplot, title = "test")
+dataWY$MSOA11CD <- substr(dataWY$pid,1,9)
+clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "test")
+
 
 ###########################
 ##### Purity approach #####
 ###########################
+
+getPurity()
+
+purity()
+
 
 

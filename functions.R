@@ -652,14 +652,29 @@ interClust <- function(ccs,ccs2){
   return(res)
 }
 
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+# For testing
+#feat1 <- momentsWY
+#feat2 <- labelsWY
+#nclust <- 6
+#nclust2 <- 6
+#data <- dataWY
+#skip = floor(0.05 * nrow(feat1))
+######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+
 # Results of intersection
-clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, format = FALSE, normalised = FALSE, colNames1 = colnames(feat1)[2:ncol(feat1)], colNames2 = colnames(feat2)[2:ncol(feat2)]){
+clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0.05 * nrow(feat1)), format = FALSE, normalised = FALSE, colNames1 = colnames(feat1)[2:ncol(feat1)], colNames2 = colnames(feat2)[2:ncol(feat2)]){
   if(format == TRUE){
     feat1 <- formatFeat(feat1, normalised, colNames1)
     feat2 <- formatFeat(feat2, normalised, colNames2)
   }
+  feat1a <- feat1[order(row.names(feat1)),]
+  feat2a <- feat2[order(row.names(feat2)),]
+  if(any(row.names(feat1a) != row.names(feat2a))){
+    stop("Feature data frames do not contain the same areas")
+  }
   #
-  dfeat1 <- dist(feat1)
+  dfeat1 <- dist(feat1a)
   clust1 <- hclust(dfeat1)
   cut1 <- cutree(clust1, k = nclust)
   ccs1 <- list(NULL)
@@ -667,27 +682,53 @@ clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, format = FALSE
     ccs1[[i]] <- names(cut1[which(cut1 == i)])
   }
   #
-  dfeat2 <- dist(feat2)
+  dfeat2 <- dist(feat2a)
   clust2 <- hclust(dfeat2)
   cut2 <- cutree(clust2, k = nclust2)
   ccs2 <- list(NULL)
   for(i in 1:nclust2){
     ccs2[[i]] <- names(cut2[which(cut2 == i)])
   }
+  # Remove small clusters
+  remove1 <- NULL
+  remove2 <- NULL
+  ccs1a <- ccs1
+  ccs2a <- ccs2
+  clustind1 <- 1:nclust
+  clustind2 <- 1:nclust2
+  for(i in 1:nclust){
+    if(length(ccs1a[[i]]) <= skip){
+      remove1 <- c(remove1,ccs1a[[i]])
+      ccs1 <- ccs1[-i]
+      clustind1 <- clustind1[-i]
+    }
+  }
+  for(i in 1:nclust2){
+    if(length(ccs2a[[i]]) <= skip){
+      remove2 <- c(remove2,ccs2a[[i]])
+      ccs2 <- ccs2[-i]
+      clustind2 <- clustind2[-i]
+    }
+  }
   #
   res1 <- interClust(ccs1,ccs2)
   name1 <- deparse(substitute(feat1))
   name2 <- deparse(substitute(feat2))
-  colnames(res1) <- sapply(1:nclust,function(x){paste(name1,x,sep = ".")})
-  rownames(res1) <- sapply(1:nclust2,function(x){paste(name2,x,sep = ".")})
+  rownames(res1) <- sapply(clustind1,function(x){paste(name1,x,sep = ".")})
+  colnames(res1) <- sapply(clustind2,function(x){paste(name2,x,sep = ".")})
   res2 <- res1
   res3 <- res1
-  for(i in 1:nrow(testY)){
+  for(i in 1:nrow(res1)){
     res2[i,] <- round(res2[i,]/rowSums(res2)[i] * 100,1)
+  }
+  for(i in 1:ncol(res1)){
     res3[,i] <- round(res3[,i]/colSums(res3)[i] * 100,1)
   }
-  return(list(res1,res2,res3))
+  res <- list(res1,res2,res3,purity(cut2,cut1)[[1]])
+  names(res) <- c("interNumbers","inter1perCent","inter2perCent","purity")
+  return(res)
 }
+
 
 ### Build moments
 
@@ -719,4 +760,76 @@ makeMoments <- function(data,scale = c("LSOA11CD","MSOA11CD","LAD20CD"),variable
   return(moments)
 }
 
+### Characterise content of clusters
 
+extractCluster <- function(feat, nclust, format = FALSE, normalised = FALSE, colNames = colnames(feat)[2:ncol(feat)]){
+  if(format == TRUE){
+    feat <- formatFeat(feat, normalised, colNames)
+  }
+  #
+  dfeat <- dist(feat)
+  clust <- hclust(dfeat)
+  cut <- cutree(clust, k = nclust)
+  ccs <- list(NULL)
+  for(i in 1:nclust){
+    ccs[[i]] <- feat[names(cut[which(cut == i)]),]
+  }
+  return(ccs)
+}
+
+clusterCarac <- function(cluster, folderOut, fplot, title = NA, breaks = 10){
+  nrows = length(cluster)
+  ncols = ncol(cluster[[1]])
+  png(file=file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")), width=200*ncols, height=200*nrows)
+  par(mfrow = c(nrows, ncols))
+  for(i in 1:nrows){
+    for(j in 1:ncols){
+      hist(cluster[[i]][,j], breaks, xlim = c(0,max(1,max(cluster[[i]][,j]))), freq = T, main = paste("Cluster ", i, "; ", names(cluster[[i]][j]), sep = ""))
+    }
+  }
+  dev.off()
+}
+
+clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, scale, title = NA, skip = 0, breaks = 10, height = "find", res = 400){
+  nrows = floor(sqrt(length(cluster)))
+  ncols = ceiling(sqrt(length(cluster)))
+  l <- rep(NA,length(cluster))
+  for(i in 1:length(cluster)){
+    if(nrow(cluster[[i]]) > (skip + 1) * (skip + 1)){
+      l[i] <- floor(nrow(cluster[[i]])/(skip + 1))
+    }else{
+      l[i] <- nrow(cluster[[i]])
+    }
+  }
+  MX <- matrix(NA, nrow = sum(l), ncol = 2*breaks)
+  MY <- matrix(NA, nrow = sum(l), ncol = 2*breaks)
+  for(i in 1:length(cluster)){
+    for(k in 1:l[i]){
+      if(l[i] > (skip + 1) * (skip + 1)){
+        ref <- row.names(cluster[[i]])[pmin(1 + (skip + 1) * (k - 1), nrow(cluster[[i]]))]
+      }else{
+        ref <- row.names(cluster[[i]])
+      }
+      h <- hist(data[data[,scale] %in% ref,variable_name], breaks = breaks, plot = F)
+      index <- k + sum(l[0:(i-1)])
+      MY[index,1:length(h$density)] <- h$density
+      MX[index,1:length(h$mids)] <- h$mids
+    }
+  }
+  png(file=file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".png", sep = "")), width= res*ncols, height=res*nrows)
+  par(mfrow = c(nrows, ncols))
+  for(i in 1:length(cluster)){
+    ind <- 1 + sum(l[0:(i-1)])
+    if(height == "find"){
+      h <- max(MY, na.rm = T) * 1.1
+    }else {
+      h <- height
+    }
+    plot(MX[ind,],MY[ind,], ylim = c(0,h), xlim = c(0, max(MX, na.rm = T)), pch = NA, main = paste("Cluster", i, sep = " "), ylab = "frequency", xlab = variable_name)
+    for(k in 1:l[i]){
+      ind <- k + sum(l[0:(i-1)])
+      lines(MX[ind,], MY[ind,], col = alpha(i, 0.5))
+    }
+  }
+  dev.off()
+}
