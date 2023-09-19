@@ -2,6 +2,8 @@
 
 WIP to create a robust data validation method for [SPC](https://github.com/alan-turing-institute/uatk-spc).
 
+Use `create_environment` to set up the environment for both methods.
+
 ## Method 1: XAI-based approach
 
 We test how SHAP explains an xgboost model that predicts the four first moments of any distribution from potentially significant variables.
