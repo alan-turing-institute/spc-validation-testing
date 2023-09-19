@@ -30,7 +30,7 @@ Scale refers to the base scale in the raw data; gets aggregated when requested b
 
 ## Method 2: Clustering intersection approach
 
-<mark>Use `runInter.R`.</mark> This file contains a few functions to test how similar two clustering based on different features are and to plot the contents of particular functions.
+<mark>Use `runInter.R`.</mark> This file contains a few functions to test how similar two clustering based on different features are and to plot the contents of particular clusters.
 
 
 ## Original issue
