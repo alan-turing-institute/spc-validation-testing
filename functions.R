@@ -5,8 +5,7 @@
 ################################
 
 
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
-# For testing
+###### Toolbox for testing ######
 #area_name = "west-yorkshire"
 #scale = "LSOA11CD"
 #scale = "MSOA11CD"
@@ -19,7 +18,7 @@
 
 #colnames(data)
 #head(data)
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+###### Toolbox for testing ######
 
 downloadPrerequisites <- function(folderIn,fdl){
   n <- 0
@@ -60,7 +59,7 @@ downloadPrerequisites <- function(folderIn,fdl){
   print(paste("Downloaded", n, "new file(s); skipped", 5-n, "file(s) that already exist", sep = " "))
 }
 
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+###### Toolbox for testing ######
 ###### Check centrality meaning ######
 #M <- matrix(c(1,0,2,3,0,3,0,2,3,1,1,3,0,2,1,1), ncol = 4)
 #M
@@ -74,7 +73,7 @@ downloadPrerequisites <- function(folderIn,fdl){
 #betweenness(n,directed = TRUE, weights = rep(1,length(E(n))), normalized = FALSE)
 #betweenness(n,directed = FALSE, weights = rep(1,length(E(n))), normalized = FALSE)
 #betweenness(n,directed = TRUE, normalized = FALSE)
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+###### Toolbox for testing ######
 
 
 createOD <- function(folderIn,fdl,fproc,scale = c("LSOA11CD", "MSOA11CD")){
@@ -356,8 +355,7 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
   return(labels_area)
 }
 
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
-# For testing
+###### Toolbox for testing ######
 #downloadPrerequisites(folderIn,fdl)
 #loadPrerequisites(folderIn,fdl)
 
@@ -367,7 +365,7 @@ prepareLabels <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD2
 #test <- prepareLabels("west-yorkshire", 2020, scale = "MSOA11CD", data = NULL)
 #test <- prepareLabels("west-yorkshire", 2020, scale = "LAD20CD", data = NULL)
 #test <- prepareLabels("west-yorkshire", 2020, scale = "LSOA11CD", data = dataWY)
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+###### Toolbox for testing ######
 
 
 ####################
@@ -394,8 +392,7 @@ findmoments <- function(dstrb, graph = TRUE){
   return(c(step$mean,step$sd,step$skewness,step$kurtosis))
 }
 
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
-# For testing
+###### Toolbox for testing ######
 #area_name = "west-yorkshire"
 #scale = "LSOA11CD"
 #scale = "MSOA11CD"
@@ -415,7 +412,7 @@ findmoments <- function(dstrb, graph = TRUE){
 #unique(dataS$LAD20CD)
 
 #test <- runSHAP(area_name, date, scale, "incomeH", 3)
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+###### Toolbox for testing ######
 
 # Taken from global environment: folderIn, farea, lu
 runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), variable_name, ntrain, predNames = "all", data = NULL, predictors = NULL, seed = NULL){
@@ -503,6 +500,89 @@ runSHAP <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"),
   explainer <- shapr(x_train, model)
   explanation_kurt <- explain(x_test,approach = "empirical",explainer = explainer,prediction_zero = mean(y_train_kurt))
   return(list(explanation_mean$dt,explanation_sd$dt,explanation_skew$dt,explanation_kurt$dt,c(area_name, date, scale, variable_name, seed)))
+}
+
+runSHAP2.3 <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD"), variable_name, ntrain, predNames = "all", data = NULL, predictors = NULL, seed = NULL){
+  scale <- match.arg(scale)
+  # set seed
+  if(is.null(seed)){
+    seed <- floor(runif(5,10000000,99999999))[5]
+    set.seed(seed)
+  }else{
+    set.seed(seed)
+  }
+  # Load and trim Azure file
+  if(is.null(data)){
+    data <- loadArea(area_name,date,folderIn,farea)
+  }
+  data <- merge(data,lu[,c("OA11CD","LSOA11CD","MSOA11CD","LAD20CD")], by.x = "OA11CD", by.y = "OA11CD", all.x = T)
+  predictions <- data[,c(variable_name,scale)]
+  # Load predictors
+  if(is.null(predictors)){
+    predictors <- loadLabels(area_name,date,scale)
+  }
+  # Remove NA values and check area lists match
+  save_area_list <- unique(predictions[,scale])
+  save_pred_list <- unique(predictors[,scale])
+  #
+  predictions <- predictions[complete.cases(predictions), ]
+  new_area_list <- unique(predictions[,scale])
+  removed_area_NA <- setdiff(save_area_list, new_area_list)
+  #
+  if(any(predNames != "all")){
+    predictors <- predictors[complete.cases(predictors),c(scale,predNames)]
+  }else{
+    predictors <- predictors[complete.cases(predictors), ]
+  }
+  new_pred_list <- unique(predictors[,scale])
+  removed_pred_NA <- setdiff(save_pred_list, new_pred_list)
+  #
+  final_area_list <- sort(intersect(new_area_list,new_pred_list), decreasing = FALSE)
+  l <- length(final_area_list)
+  removed_dont_match <- setdiff(new_area_list, new_pred_list)
+  #
+  if(length(removed_area_NA) > 0){
+    print(paste("Removed",removed_area_NA,"due to all", variable_name,"are NA inside the area", sep = " "))
+  }
+  if(length(removed_pred_NA) > 0){
+    print(paste("Removed",removed_pred_NA,"due to some NA values within the predictors", sep = " "))
+  }
+  if(length(removed_dont_match) > 0){
+    print(paste("Removed",removed_dont_match,"due to these areas not existing in one of the datasets", sep = " "))
+  }
+  # 
+  predictors <- predictors[predictors[,scale] %in% final_area_list,]
+  predictors <- predictors[order(predictors[,scale]),]
+  row.names(predictors) <- 1:nrow(predictors)
+  # Get predictions (moments)
+  print("Finished loading the data. Calculating predictions...")
+  moments <- data.frame(area = rep(NA,l), mean = NA, sd = NA, skewness = NA, kurtosis = NA)
+  colnames(moments)[1] <- scale
+  for(i in 1:l){
+    ref <- which(predictions[,scale] %in% new_area_list[i])
+    moments[i,1] <- new_area_list[i]
+    moments[i,2:5] <- findmoments(predictions[ref,variable_name], graph = FALSE)
+  }
+  moments <- moments[order(moments[,scale]),]
+  row.names(moments) <- 1:nrow(moments)
+  # Run SHAP
+  print("Running SHAP...")
+  testSet <- sample(1:l, ntrain)
+  x_train <- as.matrix(predictors[-testSet,2:ncol(predictors)])
+  y_train_mean <- moments[-testSet, "mean"]
+  y_train_sd <- moments[-testSet, "sd"]
+  y_train_skew <- moments[-testSet, "skewness"]
+  y_train_kurt <- moments[-testSet, "kurtosis"]
+  x_test <- as.matrix(predictors[testSet, 2:ncol(predictors)])
+  model <- xgboost(data = x_train,label = y_train_mean,nround = 20,verbose = FALSE)
+  explanation_mean <- explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_mean))
+  model <- xgboost(data = x_train,label = y_train_sd,nround = 20,verbose = FALSE)
+  explanation_sd <- explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_sd))
+  model <- xgboost(data = x_train,label = y_train_skew,nround = 20,verbose = FALSE)
+  explanation_skew <- explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_skew))
+  model <- xgboost(data = x_train,label = y_train_kurt,nround = 20,verbose = FALSE)
+  explanation_kurt <- explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_kurt))
+  return(list(explanation_mean,explanation_sd,explanation_skew,explanation_kurt,c(area_name, date, scale, variable_name, seed)))
 }
 
 plotSHAP <- function(resSHAP, folderOut, fplot){

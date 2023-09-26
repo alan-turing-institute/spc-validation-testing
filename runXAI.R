@@ -17,7 +17,14 @@
 #############
 
 
-install.packages(c('igraph','readxl','geojsonR','geosphere','tidyr','xgboost','shapr','fitdistrplus'))
+install.packages(c('igraph','readxl','geojsonR','geosphere','tidyr','xgboost','shapr','fitdistrplus','ggplot2','ggbeeswarm'))
+
+# To use updated version of shapr not yet on CRAN. Then, use 'runSHAP2.3' instead of 'runSHAP'.
+# https://cran.r-project.org/bin/windows/Rtools/
+install.packages(c('remotes','R.utils'))
+library(remotes)
+library(R.utils)
+remotes::install_github("NorskRegnesentral/shapr")
 
 library(igraph)
 library(readxl)
@@ -27,6 +34,8 @@ library(tidyr)
 library(xgboost)
 library(shapr)
 library(fitdistrplus)
+library(ggplot2)
+library(ggbeeswarm)
 
 source('functions.R')
 
@@ -71,7 +80,7 @@ downloadPrerequisites(folderIn,fdl)
 #               skipLoad = FALSE
 #               )
 
-preds <- prepareLabels("west-yorkshire", 2020, "LAD20CD", folderIn, fdl, fproc)
+preds <- prepareLabels("west-yorkshire", 2020, "MSOA11CD", folderIn, fdl, fproc)
 
 # The first analysis at LSOA scale can be very slow, since all the data must first be prepped and saved once at that scale.
 # The long bits can be done directly by running:
@@ -120,6 +129,14 @@ test2 <- runSHAP("west-yorkshire", 2020, "MSOA11CD", "incomeH", 20, data = dataW
 test3 <- runSHAP("west-yorkshire", 2020, "MSOA11CD", "incomeH", 20, data = dataWY, seed = test1[[5]][5])
 test4 <- runSHAP("west-yorkshire", 2020, "MSOA11CD", "incomeH", 20, data = dataWY, seed = 18061815)
 
+testa <- runSHAP2.3("west-yorkshire", 2020, "MSOA11CD", "incomeH", 20, predNames = columnsPreds)
+
+plot(testa[[1]], index_x_explain = 1:10)
+
+info <- testa[[5]]
+png(file=file.path(folderOut,fplot,paste(info[1], info[2], info[3], info[4], info[5], "feature_importance_beeswarm.png", sep = "-")), width=1250, height=1000)
+plot(testa[[1]], plot_type = "beeswarm")
+dev.off()
 
 ##
 

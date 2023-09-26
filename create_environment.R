@@ -1,3 +1,6 @@
+# require(installr)
+# updateR()
+
 # Random sandboxes
 #install.packages(c('gamlss','gamlss.tr','gamlss.dist','gamlss.add','fitdistrplus','univariateML','R.utils','ggplot2','tidyr'))
 
@@ -10,6 +13,9 @@ install.packages('geojsonR')
 install.packages('geosphere')
 install.packages('tidyr')
 install.packages('fitdistrplus')
+install.packages('R.utils')
+install.packages('ggplot2')
+install.packages('ggbeeswarm')
 
 # Test intersection:
 install.packages('scales')
