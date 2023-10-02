@@ -732,15 +732,14 @@ interClust <- function(ccs,ccs2){
   return(res)
 }
 
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
-# For testing
+###### Toolbox for testing ######
 #feat1 <- momentsWY
 #feat2 <- labelsWY
-#nclust <- 6
+#nclust <- 3
 #nclust2 <- 6
 #data <- dataWY
 #skip = floor(0.05 * nrow(feat1))
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+###### Toolbox for testing ######
 
 # Results of intersection
 clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0.05 * nrow(feat1)), format = FALSE, normalised = FALSE, colNames1 = colnames(feat1)[2:ncol(feat1)], colNames2 = colnames(feat2)[2:ncol(feat2)]){
@@ -770,6 +769,8 @@ clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0
     ccs2[[i]] <- names(cut2[which(cut2 == i)])
   }
   # Remove small clusters
+  name1 <- deparse(substitute(feat1))
+  name2 <- deparse(substitute(feat2))
   remove1 <- NULL
   remove2 <- NULL
   ccs1a <- ccs1
@@ -781,6 +782,7 @@ clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0
       remove1 <- c(remove1,ccs1a[[i]])
       ccs1 <- ccs1[-i]
       clustind1 <- clustind1[-i]
+      print(paste("Removed cluster", i ,"of", name1, "with only", length(ccs1a[[i]]), "elements", sep = " "))
     }
   }
   for(i in 1:nclust2){
@@ -788,12 +790,11 @@ clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0
       remove2 <- c(remove2,ccs2a[[i]])
       ccs2 <- ccs2[-i]
       clustind2 <- clustind2[-i]
+      print(paste("Removed cluster", i ,"of", name2, "with only", length(ccs2a[[i]]), "elements", sep = " "))
     }
   }
   #
   res1 <- interClust(ccs1,ccs2)
-  name1 <- deparse(substitute(feat1))
-  name2 <- deparse(substitute(feat2))
   rownames(res1) <- sapply(clustind1,function(x){paste(name1,x,sep = ".")})
   colnames(res1) <- sapply(clustind2,function(x){paste(name2,x,sep = ".")})
   res2 <- res1
@@ -809,15 +810,45 @@ clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0
   return(res)
 }
 
+findNumberClusters <- function(feat1, feat2, min, max){
+  res <- matrix(NA, ncol = max, nrow = max)
+  row <- rep(NA,max)
+  col <- rep(NA,max)
+  val <- rep(NA,max)
+  for(i in min:max){
+    for(j in min:max){
+      invisible(capture.output(temp <- clustMatching(feat1, feat2, nclust = i, nclust2 = j)))
+      res[i,j] <- temp$purity
+      row
+    }
+  }
+  # Plot
+  res2 <- rbind(rep(NA,max),res)
+  res2 <- cbind(rep(NA,max + 1),res2)
+  res2 <- t(res2)
+  name1 <- deparse(substitute(feat1))
+  name2 <- deparse(substitute(feat2))
+  axx <- list(title = name1)
+  axy <- list(title = name2)
+  axz <- list(title = "Purity")
+  fig <- plot_ly(z = res2, type = 'surface')
+  fig <- fig %>% layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz))
+  fig
+  # Result
+  maxInd <- which.max(res)
+  l <- list(maxInd %% max,floor(maxInd/max) + 1,res[maxInd],fig)
+  names(l) <- c(paste("nclust",name1,sep = "_"),paste("nclust",name2,sep = "_"),"purity","figure")
+  return(l)
+}
+
 
 ### Build moments
 
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
-# For testing
+###### Toolbox for testing ######
 #scale = "MSOA11CD"
 #variable_name <- "incomeH"
 #data <- dataWY
-######🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠🛠######
+###### Toolbox for testing ######
 
 makeMoments <- function(data,scale = c("LSOA11CD","MSOA11CD","LAD20CD"),variable_name){
   print("Loading look-up table...")
@@ -846,33 +877,42 @@ extractCluster <- function(feat, nclust, format = FALSE, normalised = FALSE, col
   if(format == TRUE){
     feat <- formatFeat(feat, normalised, colNames)
   }
+  feata <- feat[order(row.names(feat)),]
   #
-  dfeat <- dist(feat)
+  dfeat <- dist(feata)
   clust <- hclust(dfeat)
   cut <- cutree(clust, k = nclust)
   ccs <- list(NULL)
   for(i in 1:nclust){
-    ccs[[i]] <- feat[names(cut[which(cut == i)]),]
+    ccs[[i]] <- feata[names(cut[which(cut == i)]),]
   }
   return(ccs)
 }
 
-clusterCarac <- function(cluster, folderOut, fplot, title = NA, breaks = 10){
+clusterCarac <- function(cluster, folderOut, fplot, title = NA, breaks = 10, freqOpt = T){
   nrows = length(cluster)
   ncols = ncol(cluster[[1]])
   png(file=file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")), width=200*ncols, height=200*nrows)
   par(mfrow = c(nrows, ncols))
   for(i in 1:nrows){
     for(j in 1:ncols){
-      hist(cluster[[i]][,j], breaks, xlim = c(0,max(1,max(cluster[[i]][,j]))), freq = T, main = paste("Cluster ", i, "; ", names(cluster[[i]][j]), sep = ""))
+      hist(cluster[[i]][,j], breaks, xlim = c(0,max(1,max(cluster[[i]][,j]))), freq = freqOpt, main = paste("Cluster ", i, "; ", names(cluster[[i]][j]), sep = ""), xlab = "")
     }
   }
   dev.off()
+  print(paste("Saved in", file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")),sep = " "))
 }
 
+i = 1
+
 clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, scale, title = NA, skip = 0, breaks = 10, height = "find", res = 400){
-  nrows = floor(sqrt(length(cluster)))
-  ncols = ceiling(sqrt(length(cluster)))
+  a <- c(1,1,1,2,2,2,2,2,3,2,3,3,3,3,3,4,4,4,4,4,4,4,4,4,5)
+  b <- c(1,2,3,2,3,3,4,4,3,5,4,4,5,5,5,4,5,5,5,5,6,6,6,6,5)
+  if(length(cluster) > 25){
+    stop("Come on... that's a lot of clusters")
+  }
+  nrows = a[length(cluster)]
+  ncols = b[length(cluster)]
   l <- rep(NA,length(cluster))
   for(i in 1:length(cluster)){
     if(nrow(cluster[[i]]) > (skip + 1) * (skip + 1)){
@@ -902,7 +942,10 @@ clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, 
     ind <- 1 + sum(l[0:(i-1)])
     if(height == "find"){
       h <- max(MY, na.rm = T) * 1.1
-    }else {
+    } else if(height == F){
+      h <- max(MY[sum(l[0:(i-1)]) + 1:l[i],], na.rm = T) * 1.1
+    }
+    else{
       h <- height
     }
     plot(MX[ind,],MY[ind,], ylim = c(0,h), xlim = c(0, max(MX, na.rm = T)), pch = NA, main = paste("Cluster", i, sep = " "), ylab = "frequency", xlab = variable_name)
@@ -912,4 +955,5 @@ clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, 
     }
   }
   dev.off()
+  print(paste("Saved in", file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".png", sep = "")), sep = " "))
 }

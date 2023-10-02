@@ -5,6 +5,7 @@
 
 library(scales)
 library(funtimes)
+library(fitdistrplus)
 
 source('functions.R')
 
@@ -64,7 +65,18 @@ momentsWY <- formatFeat(moments, normalised = TRUE)
 labels <- loadLabels("west-yorkshire",2020, "MSOA11CD")
 labelsWY <- formatFeat(labels, normalised = TRUE, colNames = c("closeness_all","betweenness","distHPD","popDens","medAge","IMD19_ranks"))
 #
-test <- clustMatching(momentsWY, labelsWY, nclust = 4)
+test <- clustMatching(momentsWY, labelsWY, nclust = 3, nclust2 = 4, skip = 13)
+
+# Utility to estimate the best number of clusters
+# Format as formatFeat results
+# findNumberClusters(
+#                    feat1,
+#                    feat2,
+#                    min,
+#                    max)
+
+test <- findNumberClusters(momentsWY, labelsWY, 3, 10)
+test
 
 
 ################################
@@ -81,9 +93,10 @@ test <- clustMatching(momentsWY, labelsWY, nclust = 4)
 #                colNames = colnames(feat)[2:ncol(feat)]
 #                )
 
-test <- extractCluster(momentsWY, nclust = 4)
+test <- extractCluster(momentsWY, nclust = 3)
+testa <- extractCluster(labelsWY, nclust = 4)
 
-# Scatterplot of clustering features within each cluster
+# Density distributions of clustering features within each cluster
 # clusterCarac(
 #              cluster,
 #              folderOut,
@@ -107,5 +120,19 @@ test <- extractCluster(momentsWY, nclust = 4)
 #                     )
 
 clusterCarac(test, folderOut, fplot, title = "test")
+clusterCarac(testa, folderOut, fplot, title = "testa")
+
 dataWY$MSOA11CD <- substr(dataWY$pid,1,9)
+
 clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "test")
+clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "testa", height = FALSE, skip = 3)
+
+colnames(dataWY)
+
+clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "age", scale = "MSOA11CD", title = "test2")
+
+clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "age", scale = "MSOA11CD", title = "testa3", height = FALSE)
+
+
+
+

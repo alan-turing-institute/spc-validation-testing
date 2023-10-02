@@ -6,6 +6,270 @@ library(univariateML)
 set.seed(18061815)
 
 
+
+
+
+dataWY <- loadArea("west-yorkshire",2020,folderIn,farea)
+moments <- makeMoments(dataWY, "MSOA11CD", "incomeH")
+momentsWY <- formatFeat(moments, normalised = TRUE)
+#
+labels <- loadLabels("west-yorkshire",2020, "MSOA11CD")
+labelsWY <- formatFeat(labels, normalised = TRUE, colNames = c("closeness_all","betweenness","distHPD","popDens","medAge","IMD19_ranks"))
+#
+test <- clustMatching(momentsWY, labelsWY, nclust = 4)
+
+min = 3
+max = 10
+feat1 = momentsWY
+feat2 = labelsWY
+
+nclust = 3
+nclust2 = 4
+
+test <- clustMatching(momentsWY, labelsWY, nclust = 4, skip = 14)
+
+
+clustMatching(feat1, feat2, nclust = i, nclust2 = j, skip = 14)
+lustMatching(feat1, feat2, nclust = i, nclust2 = j, skip = 14)
+
+
+findNumberClusters <- function(feat1, feat2, min, max){
+  res <- matrix(NA, ncol = max, nrow = max)
+  row <- rep(NA,max)
+  col <- rep(NA,max)
+  val <- rep(NA,max)
+  for(i in min:max){
+    for(j in min:max){
+      temp <- clustMatching(feat1, feat2, nclust = i, nclust2 = j, skip = 14)
+      res[i,j] <- temp$purity
+      row
+    }
+  }
+  # Plot
+  res2 <- rbind(rep(NA,max),res)
+  res2 <- cbind(rep(NA,max + 1),res2)
+  res2 <- t(res2)
+  name1 <- deparse(substitute(feat1))
+  name2 <- deparse(substitute(feat2))
+  axx <- list(title = name1)
+  axy <- list(title = name2)
+  axz <- list(title = "Purity")
+  fig <- plot_ly(z = res2, type = 'surface')
+  fig <- fig %>% layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz))
+  fig
+  # Result
+  maxInd <- which.max(res)
+  l <- list(maxInd %% max,floor(maxInd/max) + 1,res[maxInd],fig)
+  names(l) <- c(paste("nclust",name1,sep = "_"),paste("nclust",name2,sep = "_"),"purity","figure")
+  return(l)
+}
+
+dev.off()
+
+test <- findNumberClusters(momentsWY, labelsWY, 3, 10)
+
+test[[4]]
+
+
+res <- matrix(c(1:11,25,12:24), ncol = 5, nrow = 5)
+
+temp <- which.max(res)
+
+plot(1:3,1:3)
+
+temp %% 5
+floor(temp/5) + 1
+
+res <- rep(list(NULL),3)
+
+for(i in 3:10){
+  for(j in 3:10){
+    test <- clustMatching(momentsWY, labelsWY, nclust = i, nclust2 = j)
+    res[[1]] <- c(res[[1]],i)
+    res[[2]] <- c(res[[2]],j)
+    res[[3]] <- c(res[[3]],print(test$purity))
+  }
+}
+
+res[[1]][which.max(res[[3]])]
+res[[2]][which.max(res[[3]])]
+res[[3]][which.max(res[[3]])]
+
+clustMatching(momentsWY, labelsWY, nclust = 4, nclust2 = 4)
+
+
+install.packages('plotly')
+library(plotly)
+
+# Plot
+plot_ly(z = volcano, type = "surface")
+
+
+
+
+
+############################
+############################
+############################
+############################
+############################
+
+feat2 = labelsWY
+nclust2 = 3
+nclust2 = 4
+
+feat2a <- feat2[order(row.names(feat2)),]
+
+dfeat2 <- dist(feat2a)
+clust2 <- hclust(dfeat2)
+cut2 <- cutree(clust2, k = nclust2)
+ccs2 <- list(NULL)
+for(i in 1:nclust2){
+  ccs2[[i]] <- names(cut2[which(cut2 == i)])
+}
+# Remove small clusters
+remove1 <- NULL
+remove2 <- NULL
+ccs1a <- ccs1
+ccs2a <- ccs2
+clustind1 <- 1:nclust
+clustind2 <- 1:nclust2
+for(i in 1:nclust){
+  if(length(ccs1a[[i]]) <= skip){
+    remove1 <- c(remove1,ccs1a[[i]])
+    ccs1 <- ccs1[-i]
+    clustind1 <- clustind1[-i]
+  }
+}
+for(i in 1:nclust2){
+  if(length(ccs2a[[i]]) <= skip){
+    remove2 <- c(remove2,ccs2a[[i]])
+    ccs2 <- ccs2[-i]
+    clustind2 <- clustind2[-i]
+  }
+}
+
+
+
+
+
+############################
+############################
+############################
+############################
+############################
+
+
+clusterCarac(test, folderOut, fplot, title = "test2")
+
+cluster = test
+
+a <- rep(NA,20)
+b <- rep(NA,20)
+c <- rep(NA,20)
+for(n in 1:20){
+  a[n] <- floor(sqrt(n))
+  b[n] <- ceiling(sqrt(n))
+  c[n] <- a[n] * b[n]
+}
+
+
+
+a*b
+
+install.packages("randquotes")
+library(randquotes)
+
+1:20
+
+clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, scale, title = NA, skip = 0, breaks = 10, height = "find", res = 400){
+  a <- c(1,1,1,2,2,2,2,2,3,2,3,3,3,3,3,4,4,4,4,4,4,4,4,4,5)
+  b <- c(1,2,3,2,3,3,4,4,3,5,4,4,5,5,5,4,5,5,5,5,6,6,6,6,5)
+  if(length(clusters) > 25){
+    stop("Come on... that's a lot of clusters")
+  }
+  nrows = a[length(cluster)]
+  ncols = b[length(cluster)]
+  l <- rep(NA,length(cluster))
+  for(i in 1:length(cluster)){
+    if(nrow(cluster[[i]]) > (skip + 1) * (skip + 1)){
+      l[i] <- floor(nrow(cluster[[i]])/(skip + 1))
+    }else{
+      l[i] <- nrow(cluster[[i]])
+    }
+  }
+  MX <- matrix(NA, nrow = sum(l), ncol = 2*breaks)
+  MY <- matrix(NA, nrow = sum(l), ncol = 2*breaks)
+  for(i in 1:length(cluster)){
+    for(k in 1:l[i]){
+      if(l[i] > (skip + 1) * (skip + 1)){
+        ref <- row.names(cluster[[i]])[pmin(1 + (skip + 1) * (k - 1), nrow(cluster[[i]]))]
+      }else{
+        ref <- row.names(cluster[[i]])
+      }
+      h <- hist(data[data[,scale] %in% ref,variable_name], breaks = breaks, plot = F)
+      index <- k + sum(l[0:(i-1)])
+      MY[index,1:length(h$density)] <- h$density
+      MX[index,1:length(h$mids)] <- h$mids
+    }
+  }
+  png(file=file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".png", sep = "")), width= res*ncols, height=res*nrows)
+  par(mfrow = c(nrows, ncols))
+  for(i in 1:length(cluster)){
+    ind <- 1 + sum(l[0:(i-1)])
+    if(height == "find"){
+      h <- max(MY, na.rm = T) * 1.1
+    }else {
+      h <- height
+    }
+    plot(MX[ind,],MY[ind,], ylim = c(0,h), xlim = c(0, max(MX, na.rm = T)), pch = NA, main = paste("Cluster", i, sep = " "), ylab = "frequency", xlab = variable_name)
+    for(k in 1:l[i]){
+      ind <- k + sum(l[0:(i-1)])
+      lines(MX[ind,], MY[ind,], col = alpha(i, 0.5))
+    }
+  }
+  dev.off()
+  print(paste("Saved in", file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".png", sep = "")), sep = " "))
+}
+
+
+
+
+
+
+
+i = 4
+j = 3
+
+hist(cluster[[i]][,j], breaks, xlim = c(0,max(1,max(cluster[[i]][,j]))), freq = T, main = paste("Cluster ", i, "; ", names(cluster[[i]][j]), sep = ""), xlab = "")
+
+hist(cluster[[i]][,j], breaks, xlim = c(0,max(1,max(cluster[[i]][,j]))), main = paste("Cluster ", i, "; ", names(cluster[[i]][j]), sep = ""), xlab = "")
+
+
+clusterCarac <- function(cluster, folderOut, fplot, title = NA, breaks = 10){
+  nrows = length(cluster)
+  ncols = ncol(cluster[[1]])
+  png(file=file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")), width=200*ncols, height=200*nrows)
+  par(mfrow = c(nrows, ncols))
+  for(i in 1:nrows){
+    for(j in 1:ncols){
+      hist(cluster[[i]][,j], breaks, xlim = c(0,max(1,max(cluster[[i]][,j]))), freq = T, main = paste("Cluster ", i, "; ", names(cluster[[i]][j]), sep = ""), xlab = "")
+    }
+  }
+  dev.off()
+  print(paste("Saved in", file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")),sep = " "))
+}
+
+
+
+
+clusterCarac(test, folderOut, fplot, title = "test2")
+
+clusterCarac(test, folderOut, fplot, title = "test2a", freqOpt = F)
+
+
+
+
 compare_distrib <- function(distrib1,distrib2){
   test <- FALSE
   model1 <- model_select(distrib1)
