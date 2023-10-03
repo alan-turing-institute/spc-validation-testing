@@ -903,8 +903,6 @@ clusterCarac <- function(cluster, folderOut, fplot, title = NA, breaks = 10, fre
   print(paste("Saved in", file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")),sep = " "))
 }
 
-i = 1
-
 clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, scale, title = NA, skip = 0, breaks = 10, height = "find", res = 400){
   a <- c(1,1,1,2,2,2,2,2,3,2,3,3,3,3,3,4,4,4,4,4,4,4,4,4,5)
   b <- c(1,2,3,2,3,3,4,4,3,5,4,4,5,5,5,4,5,5,5,5,6,6,6,6,5)
@@ -956,4 +954,42 @@ clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, 
   }
   dev.off()
   print(paste("Saved in", file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".png", sep = "")), sep = " "))
+}
+
+clusterMapping <- function(cluster, scale = c("LSOA11CS","MSOA11CD","LAD20CD")){
+  scale = match.arg(scale)
+  cols <- viridis(length(cluster))
+  spdf_fortified <- NULL
+  if(scale == "MSOA11CD"){
+    if(!(file.exists(file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson")))){
+      print("Downloading geojson at MSOA scale...")
+      download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/MSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"))
+    }
+    data_json <- geojson_read(file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"), what = "sp")
+    for(i in 1:length(cluster)){
+      spdf_region = data_json[data_json@data$MSOA11CD %in% row.names(cluster[[i]]), ]
+      spdf_fortified_temp <- tidy(spdf_region)
+      spdf_fortified_temp$col <- cols[i]
+      spdf_fortified <- rbind(spdf_fortified,spdf_fortified_temp)
+    }
+  } else if(scale == "LSOA11CD"){
+    if(!(file.exists(file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson")))){
+      print("Downloading geojson at LSOA scale...")
+      download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/LSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
+    }
+    data_json <- geojson_read(file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"), what = "sp")
+    for(i in 1:length(cluster)){
+      spdf_region = data_json[data_json@data$LSOA11CD %in% row.names(cluster[[i]]), ]
+      spdf_fortified_temp <- tidy(spdf_region)
+      spdf_fortified_temp$col <- cols[i]
+      spdf_fortified <- rbind(spdf_fortified,spdf_fortified_temp)
+    }
+  } else if(scale == "LAD20CD"){
+    stop("Coming soon")
+  }
+  g <- ggplot() +
+                geom_polygon(data = spdf_fortified, aes( x = long, y = lat, group = group), fill=spdf_fortified$col, color="white") +
+                theme_void() +
+                coord_map()
+  return(g)
 }

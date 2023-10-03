@@ -17,9 +17,12 @@ install.packages('R.utils')
 install.packages('ggplot2')
 install.packages('ggbeeswarm')
 
-# Test intersection:
+# Test intersection (plus above):
 install.packages('scales')
 install.packages('funtimes')
+install.packages('geojsonio')
+install.packages('broom')
+install.packages('viridis')
 
 # Directories
 folderIn <- "Data"

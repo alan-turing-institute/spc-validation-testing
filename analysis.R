@@ -29,10 +29,20 @@ cat_vars <- colnames(data)[c(7,13,17,18,20,21)]
 
 
 
+# |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #
+# |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #
+# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv #
 
-##### 2. characterise clusters <- !!!!! Fix last function; indexing is obviously wrong
+##### 2. characterise clusters
+########## 2.1 !!!!! Fix last function; indexing is obviously wrong
+########## 2.2 Write explicit outlier detection
+
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ #
+# |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #
+# |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #
 
 
 
 ##### 3. check global SHAP values
-##### 4. track down where SHAP values are inconsistent !! = Possibility to run indicators for a specific MSOA
+##### 4. track down where SHAP values are inconsistent !! + Possibility to run indicators for a specific MSOA
+

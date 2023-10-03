@@ -6,6 +6,11 @@
 library(scales)
 library(funtimes)
 library(fitdistrplus)
+#
+library(geojsonio)
+library(broom)
+library(ggplot2)
+library(viridis)
 
 source('functions.R')
 
@@ -95,6 +100,15 @@ test
 
 test <- extractCluster(momentsWY, nclust = 3)
 testa <- extractCluster(labelsWY, nclust = 4)
+
+# Mapping
+# clusterMapping(
+#                cluster,
+#                scale = c("LSOA11CS","MSOA11CD","LAD20CD")
+#               )
+
+clusterMapping(test,"MSOA11CD")
+clusterMapping(testa,"MSOA11CD")
 
 # Density distributions of clustering features within each cluster
 # clusterCarac(
