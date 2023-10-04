@@ -911,45 +911,40 @@ clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, 
   }
   nrows = a[length(cluster)]
   ncols = b[length(cluster)]
-  l <- rep(NA,length(cluster))
-  for(i in 1:length(cluster)){
-    if(nrow(cluster[[i]]) > (skip + 1) * (skip + 1)){
-      l[i] <- floor(nrow(cluster[[i]])/(skip + 1))
-    }else{
-      l[i] <- nrow(cluster[[i]])
+  l <- length(cluster)
+  data <- data[,c(scale,variable_name)]
+  data$cluster <- 0
+  data$skip <- F
+  for(i in 1:l){
+    rn <- row.names(cluster[[i]])
+    data$cluster[data[,scale] %in% rn] <- i
+    if(length(rn) > (skip + 1) * (skip + 1)){
+      ind <- (1:length(rn))[-pmin((skip + 1)*unique(floor((1:length(rn)) / (skip + 1)) + 1),length(rn))]
+      data$skip[data[,scale] %in% rn[ind]] <- T
     }
   }
-  MX <- matrix(NA, nrow = sum(l), ncol = 2*breaks)
-  MY <- matrix(NA, nrow = sum(l), ncol = 2*breaks)
-  for(i in 1:length(cluster)){
-    for(k in 1:l[i]){
-      if(l[i] > (skip + 1) * (skip + 1)){
-        ref <- row.names(cluster[[i]])[pmin(1 + (skip + 1) * (k - 1), nrow(cluster[[i]]))]
-      }else{
-        ref <- row.names(cluster[[i]])
-      }
-      h <- hist(data[data[,scale] %in% ref,variable_name], breaks = breaks, plot = F)
-      index <- k + sum(l[0:(i-1)])
-      MY[index,1:length(h$density)] <- h$density
-      MX[index,1:length(h$mids)] <- h$mids
-    }
-  }
+  data <- data[data$skip == F,]
   png(file=file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".png", sep = "")), width= res*ncols, height=res*nrows)
   par(mfrow = c(nrows, ncols))
   for(i in 1:length(cluster)){
-    ind <- 1 + sum(l[0:(i-1)])
+    dataTemp <- data[data$cluster == i,]
+    ref <- unique(dataTemp[,scale])
+    MX <- matrix(NA, nrow = length(ref), ncol = 2*breaks)
+    MY <- matrix(NA, nrow = length(ref), ncol = 2*breaks)
+    
+    for(j in 1:length(ref)){
+      h <- hist(data[data[,scale] == ref[j], variable_name], breaks = breaks, plot = F)
+      MX[j,1:length(h$mids)] <- h$mids
+      MY[j,1:length(h$density)] <- h$density
+    }
     if(height == "find"){
       h <- max(MY, na.rm = T) * 1.1
-    } else if(height == F){
-      h <- max(MY[sum(l[0:(i-1)]) + 1:l[i],], na.rm = T) * 1.1
-    }
-    else{
+    } else{
       h <- height
     }
-    plot(MX[ind,],MY[ind,], ylim = c(0,h), xlim = c(0, max(MX, na.rm = T)), pch = NA, main = paste("Cluster", i, sep = " "), ylab = "frequency", xlab = variable_name)
-    for(k in 1:l[i]){
-      ind <- k + sum(l[0:(i-1)])
-      lines(MX[ind,], MY[ind,], col = alpha(i, 0.5))
+    plot(MX[1,],MY[1,], ylim = c(0,h), xlim = c(0, max(MX, na.rm = T)), pch = NA, main = paste("Cluster", i, sep = " "), ylab = "frequency", xlab = variable_name)
+    for(j in 1:length(ref)){
+      lines(MX[j,], MY[j,], col = alpha(i, 0.5))
     }
   }
   dev.off()

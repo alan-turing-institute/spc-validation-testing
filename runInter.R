@@ -143,10 +143,11 @@ clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "inc
 
 colnames(dataWY)
 
-clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "age", scale = "MSOA11CD", title = "test2")
+clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "test3", height = "find", skip = 3)
+clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "test3a", height = "find", skip = 3)
 
-clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "age", scale = "MSOA11CD", title = "testa3", height = FALSE)
 
-
+test <- extractCluster(momentsWY, nclust = 10)
+clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "test4", height = "find", skip = 3)
 
 

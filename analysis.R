@@ -26,7 +26,8 @@ cat_vars <- colnames(data)[c(7,13,17,18,20,21)]
 
 
 ##### 1. find nclust (control = purity)   <- fix problem "purity" skips small classes???
-
+##### 2. characterise clusters
+########## 2.1 Fix last function; indexing is obviously wrong
 
 
 # |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #
@@ -34,7 +35,6 @@ cat_vars <- colnames(data)[c(7,13,17,18,20,21)]
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv #
 
 ##### 2. characterise clusters
-########## 2.1 !!!!! Fix last function; indexing is obviously wrong
 ########## 2.2 Write explicit outlier detection
 
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ #
