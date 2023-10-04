@@ -61,6 +61,7 @@ formatFeat(test, colNames = "B")
 #               normalised = FALSE,
 #               colNames1 = colnames(feat1)[2:ncol(feat1)],
 #               colNames2 = colnames(feat2)[2:ncol(feat2)]
+#.              flags = F
 #               )
 
 dataWY <- loadArea("west-yorkshire",2020,folderIn,farea)
@@ -70,7 +71,11 @@ momentsWY <- formatFeat(moments, normalised = TRUE)
 labels <- loadLabels("west-yorkshire",2020, "MSOA11CD")
 labelsWY <- formatFeat(labels, normalised = TRUE, colNames = c("closeness_all","betweenness","distHPD","popDens","medAge","IMD19_ranks"))
 #
-test <- clustMatching(momentsWY, labelsWY, nclust = 3, nclust2 = 4, skip = 13)
+test <- clustMatching(momentsWY, labelsWY, nclust = 3, nclust2 = 4, skip = 13, flags = T)
+View(test$flags)
+
+test <- clustMatching(momentsWY, labelsWY, nclust = 4, nclust2 = 4, skip = 13, flags = T)
+View(test$flags)
 
 # Utility to estimate the best number of clusters
 # Format as formatFeat results

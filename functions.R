@@ -742,7 +742,7 @@ interClust <- function(ccs,ccs2){
 ###### Toolbox for testing ######
 
 # Results of intersection
-clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0.05 * nrow(feat1)), format = FALSE, normalised = FALSE, colNames1 = colnames(feat1)[2:ncol(feat1)], colNames2 = colnames(feat2)[2:ncol(feat2)]){
+clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0.05 * nrow(feat1)), format = FALSE, normalised = FALSE, colNames1 = colnames(feat1)[2:ncol(feat1)], colNames2 = colnames(feat2)[2:ncol(feat2)], flags = F){
   if(format == TRUE){
     feat1 <- formatFeat(feat1, normalised, colNames1)
     feat2 <- formatFeat(feat2, normalised, colNames2)
@@ -767,6 +767,10 @@ clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0
   ccs2 <- list(NULL)
   for(i in 1:nclust2){
     ccs2[[i]] <- names(cut2[which(cut2 == i)])
+  }
+  #
+  if(flags == T){
+    flagsData <- data.frame(area = row.names(feat1a), badness = 0)
   }
   # Remove small clusters
   name1 <- deparse(substitute(feat1))
@@ -793,6 +797,11 @@ clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0
       print(paste("Removed cluster", i ,"of", name2, "with only", length(ccs2a[[i]]), "elements", sep = " "))
     }
   }
+  if(flags == T){
+    flagsData$key1 <- NA
+    flagsData$key1[flagsData$area %in% remove1] <- paste("belongs to a cluster of only", length(remove1), "areas", sep = " ")
+    flagsData$badness[flagsData$area %in% remove1] <- flagsData$badness[flagsData$area %in% remove1] + min(1000, 2000/length(remove1))
+  }
   #
   res1 <- interClust(ccs1,ccs2)
   rownames(res1) <- sapply(clustind1,function(x){paste(name1,x,sep = ".")})
@@ -805,8 +814,28 @@ clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0
   for(i in 1:ncol(res1)){
     res3[,i] <- round(res3[,i]/colSums(res3)[i] * 100,1)
   }
-  res <- list(res1,res2,res3,purity(cut2,cut1)[[1]])
-  names(res) <- c("interNumbers","inter1perCent","inter2perCent","purity")
+  if(flags == T){
+    flagsData$key2 <- NA
+    for(i in 1:length(ccs1)){
+      ref <- res2[i,]
+      for(j in 1:length(ccs1[[i]])){
+        area <- ccs1[[i]][j]
+        if(!(area %in% remove2)){
+          clust2 <- which(sapply(lapply(ccs2, function(x){grep(area, x)}), function(x){length(x) > 0}))
+          percent <- res2[i,clust2]
+          if(percent < max(res2[i,])){
+            flagsData$key2[flagsData$area == area] <- paste("belongs to cluster", clust2, "of", name2, "with only", percent, "% of such areas", sep = " ")
+            flagsData$badness[flagsData$area == area] <- flagsData$badness[flagsData$area == area] + round(10 * (100 - percent))
+          }
+        }
+      }
+    }
+    res <- list(flagsData,res1,res2,res3,purity(cut2,cut1)[[1]])
+    names(res) <- c("flags","interNumbers","inter1perCent","inter2perCent","purity")
+  } else{
+    res <- list(res1,res2,res3,purity(cut2,cut1)[[1]])
+    names(res) <- c("interNumbers","inter1perCent","inter2perCent","purity")
+  }
   return(res)
 }
 
@@ -987,4 +1016,81 @@ clusterMapping <- function(cluster, scale = c("LSOA11CS","MSOA11CD","LAD20CD")){
                 theme_void() +
                 coord_map()
   return(g)
+}
+
+readFlagsLine <- function(v){
+  print(paste(v[1], "| Total badness:", v[2], sep = " "))
+  pbs <- v[2 + which(!is.na(v[3:length(v)]))]
+  names <- names(v[2 + which(!is.na(v[3:length(v)]))])
+  for(i in 1:length(pbs)){
+    print(paste("   ", names[i], "-", pbs[i]))
+  }
+}
+
+readFlags <- function(flags, map = F, scale = NA){
+  mm <- max(flags$badness)
+  ref <- rev(0:floor((mm - 1) / 1000))
+  for(i in ref){
+    print(paste("Badness over ", i*1000 ,":", sep = ""))
+    bad_areas <- flags$area[flags$badness > i*1000 & flags$badness <= (i + 1)*1000]
+    bad_areas <- bad_areas[order(-flags$badness[flags$badness > i*1000 & flags$badness <= (i + 1)*1000])]
+    for(j in bad_areas){
+      readFlagsLine(flags[flags$area == j,])
+    }
+  }
+  if(map == T){
+    cols <- viridis(length(ref))
+    spdf_fortified <- NULL
+    if(scale == "MSOA11CD"){
+      if(!(file.exists(file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson")))){
+        print("Downloading geojson at MSOA scale...")
+        download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/MSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"))
+      }
+      data_json <- geojson_read(file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"), what = "sp")
+      non_bad_areas <- flags$area[flags$badness < 1]
+      if(length(non_bad_areas) > 0){
+        spdf_region = data_json[data_json@data$MSOA11CD %in% non_bad_areas,]
+        spdf_fortified_temp <- tidy(spdf_region)
+        spdf_fortified_temp$col <- "grey"
+        spdf_fortified <- rbind(spdf_fortified,spdf_fortified_temp)
+      }
+      for(i in 1:length(ref)){
+        bad_areas <- flags$area[flags$badness > ref[i]*1000 & flags$badness <= (ref[i] + 1)*1000]
+        if(length(bad_areas) > 0){
+          spdf_region = data_json[data_json@data$MSOA11CD %in% bad_areas,]
+          spdf_fortified_temp <- tidy(spdf_region)
+          spdf_fortified_temp$col <- cols[i]
+          spdf_fortified <- rbind(spdf_fortified,spdf_fortified_temp)
+        }
+      }
+    } else if(scale == "LSOA11CD"){
+      if(!(file.exists(file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson")))){
+        print("Downloading geojson at LSOA scale...")
+        download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/LSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
+      }
+      data_json <- geojson_read(file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"), what = "sp")
+      non_bad_areas <- flags$area[flags$badness < 1]
+      if(length(non_bad_areas) > 0){
+        spdf_region = data_json[data_json@data$MSOA11CD %in% non_bad_areas,]
+        spdf_fortified_temp <- tidy(spdf_region)
+        spdf_fortified_temp$col <- "grey"
+        spdf_fortified <- rbind(spdf_fortified,spdf_fortified_temp)
+      }
+      for(i in 1:length(ref)){
+        bad_areas <- flags$area[flags$badness > ref[i]*1000 & flags$badness <= (ref[i] + 1)*1000]
+        if(length(bad_areas) > 0){
+          spdf_region = data_json[data_json@data$LSOA11CD %in% bad_areas,]
+          spdf_fortified_temp <- tidy(spdf_region)
+          spdf_fortified_temp$col <- cols[i]
+          spdf_fortified <- rbind(spdf_fortified,spdf_fortified_temp)
+        }
+      }
+    } else if(scale == "LAD20CD"){
+      stop("Coming soon")
+    }
+    ggplot() +
+      geom_polygon(data = spdf_fortified, aes( x = long, y = lat, group = group), fill=spdf_fortified$col, color="white") +
+      theme_void() +
+      coord_map()
+  }
 }
