@@ -12,6 +12,32 @@ for(i in areas){
 prepareLabels("west-yorkshire", 2020, "LSOA11CD", folderIn, fdl, fproc)
 prepareLabels("west-yorkshire", 2020, "LAD20CD", folderIn, fdl, fproc)
 
+
+### MSOA11CD
+
+dataWY <- loadArea("west-yorkshire",2020,folderIn,farea)
+moments <- makeMoments(dataWY, "MSOA11CD", "incomeH")
+momentsWY <- formatFeat(moments, normalised = TRUE)
+#
+labels <- loadLabels("west-yorkshire",2020, "MSOA11CD")
+labelsWY <- formatFeat(labels, normalised = TRUE, colNames = c("closeness_all","betweenness","distHPD","popDens","medAge","IMD19_ranks"))
+#
+findNumberClusters(momentsWY, labelsWY, 3, 10)
+# Optimal: {3,4}, but let's take {5,5}
+interWY <- clustMatching(momentsWY, labelsWY, nclust = 5, nclust2 = 5, skip = 13, flags = T)
+readFlags(interWY$flags, map = T, scale = "MSOA11CD")
+#
+test <- extractCluster(momentsWY, nclust = 5)
+testa <- extractCluster(labelsWY, nclust = 5)
+clusterMapping(test,"MSOA11CD")
+clusterMapping(testa,"MSOA11CD")
+clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "moments", height = "find", width = 100, skip = 3)
+clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "labels", height = "find", width = 100, skip = 3)
+testb <- extractCluster(momentsWY, nclust = 10)
+clusterCaracFeature(testb, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "moments_more", height = "find", width = 100, skip = 3)
+clusterCarac(test, folderOut, fplot, title = "moments")
+clusterCarac(testa, folderOut, fplot, title = "labels")
+
 ##### Variable analysis #####
 
 num_vars <- colnames(data)[c(5,22,31)]

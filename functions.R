@@ -919,20 +919,21 @@ extractCluster <- function(feat, nclust, format = FALSE, normalised = FALSE, col
 }
 
 clusterCarac <- function(cluster, folderOut, fplot, title = NA, breaks = 10, freqOpt = T){
+  cols <- viridis(length(cluster))
   nrows = length(cluster)
   ncols = ncol(cluster[[1]])
   png(file=file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")), width=200*ncols, height=200*nrows)
   par(mfrow = c(nrows, ncols))
   for(i in 1:nrows){
     for(j in 1:ncols){
-      hist(cluster[[i]][,j], breaks, xlim = c(0,max(1,max(cluster[[i]][,j]))), freq = freqOpt, main = paste("Cluster ", i, "; ", names(cluster[[i]][j]), sep = ""), xlab = "")
+      hist(cluster[[i]][,j], breaks, xlim = c(0,max(1,max(cluster[[i]][,j]))), col = cols[i], freq = freqOpt, main = paste("Cluster ", i, "; ", names(cluster[[i]][j]), sep = ""), xlab = "")
     }
   }
   dev.off()
   print(paste("Saved in", file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")),sep = " "))
 }
 
-clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, scale, title = NA, skip = 0, breaks = 10, height = "find", res = 400){
+clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, scale, title = NA, skip = 0, breaks = 10, height = "find", width = "find", res = 400){
   a <- c(1,1,1,2,2,2,2,2,3,2,3,3,3,3,3,4,4,4,4,4,4,4,4,4,5)
   b <- c(1,2,3,2,3,3,4,4,3,5,4,4,5,5,5,4,5,5,5,5,6,6,6,6,5)
   if(length(cluster) > 25){
@@ -940,6 +941,7 @@ clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, 
   }
   nrows = a[length(cluster)]
   ncols = b[length(cluster)]
+  cols <- viridis(length(cluster))
   l <- length(cluster)
   data <- data[,c(scale,variable_name)]
   data$cluster <- 0
@@ -971,9 +973,14 @@ clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, 
     } else{
       h <- height
     }
-    plot(MX[1,],MY[1,], ylim = c(0,h), xlim = c(0, max(MX, na.rm = T)), pch = NA, main = paste("Cluster", i, sep = " "), ylab = "frequency", xlab = variable_name)
+    if(width == "find"){
+      w <- max(MX, na.rm = T) * 1.1
+    } else{
+      w <- width
+    }
+    plot(MX[1,],MY[1,], ylim = c(0,h), xlim = c(0,w), pch = NA, main = paste("Cluster", i, sep = " "), ylab = "frequency", xlab = variable_name)
     for(j in 1:length(ref)){
-      lines(MX[j,], MY[j,], col = alpha(i, 0.5))
+      lines(MX[j,], MY[j,], col = alpha(cols[i], 0.5))
     }
   }
   dev.off()
