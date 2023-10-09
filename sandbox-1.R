@@ -9,6 +9,183 @@ set.seed(18061815)
 
 
 
+#####################################################################################
+#####################################################################################
+#####################################################################################
+#####################################################################################
+#####################################################################################
+#####################################################################################
+#####################################################################################
+#####################################################################################
+
+
+
+testa <- runSHAP2.3("west-yorkshire", 2020, "MSOA11CD", "incomeH", 20, predNames = columnsPreds)
+
+plot(testa[[1]], index_x_explain = 1:10)
+plot(testa[[1]], index_x_explain = 1:10, bar_plot_phi0 = FALSE)
+
+plot(testa[[1]], plot_type = "beeswarm")
+
+temp <- testa[[1]]
+
+a <- temp$shapley_values
+b <- temp$pred_explain
+
+model <- lm(b ~ a)
+#model <- lm(a ~ b)
+plot(model)
+
+plot(a,b, pch = 20)
+#plot(b,a)
+lines(a, fitted(model))
+points(a[12],b[12],cex = 2, col = 4)
+
+simpleFunction <- function(a,b){
+  model <- lm(b ~ a)
+  plot(a,b, pch = 20)
+  lines(a, fitted(model))
+  return(model$residuals)
+}
+
+a <- temp$shapley_values
+b <- temp$pred_explain
+
+simpleFunction(a$IMD19_ranks,b)
+simpleFunction(a$medAge,b)
+simpleFunction(a$popDens,b)
+simpleFunction(a$distHPD,b)
+simpleFunction(a$closeness_all,b)
+simpleFunction(a$betweenness,b)
+
+cor(a$IMD19_ranks,b)
+cor(a$medAge,b)
+cor(a$popDens,b)
+cor(a$distHPD,b)
+cor(a$closeness_all,b)
+cor(a$betweenness,b)
+
+
+simpleFunction(a$distHPD[-7],b[-7])
+
+
+model <- lm(b ~ a$distHPD)
+
+
+colSums(abs(a))
+
+model$residuals
+
+
+temp <- testa[[1]]
+sum(testa[[1]][1])
+
+temp$shapley_values
+temp$pred_explain
+
+sum(temp$shapley_values[1])
+
+shapRes <- testa[[1]]
+
+flagSHAPOne <- function(shapRes,imp1th = 0.2,imp2th = 0.1,corth = 0.3){
+  shapValues <- as.data.frame(shapRes$shapley_values)
+  shapFeatures <- shapRes$pred_explain
+  importance <- colSums(abs(shapValues))[-1]
+  importance1 <- importance / mean(shapFeatures)
+  importance2 <- importance / max(importance)
+  #
+  cors <- NULL
+  for(i in colnames(shapValues)[-1]){
+    cors <- c(cors,cor(shapValues[,i],shapFeatures))
+  }
+  names(cors) <- names(importance)
+  df <- data.frame(feat = 1:length(shapFeatures))
+  wh <- which(importance1 >= imp1th & importance2 > imp2th & cors > corth)
+  for(i in wh){
+    model <- lm(shapValues[,i] ~ shapFeatures)
+    df[,colnames(shapValues)[i+1]] <- floor(abs(model$residuals) / sd(model$residuals))
+  }
+  return(list(importance,cors,df))
+}
+
+flagSHAP <- function(shapRes,areas,imp1th = 0.2,imp2th = 0.1,corth = 0.3,distribNames=c("Mean","Sd","Skewness","Kurtosis")){
+  all_res <- rep(list(NULL),length(shapRes) - 1)
+  for(i in 1:(length(shapRes) - 1)){
+    all_res[[i]] <- flagSHAPOne(shapRes[[i]],imp1th = 0.2,imp2th = 0.1,corth = 0.3)
+  }
+  print("Summary:")
+  for(i in 1:(length(shapRes) - 1)){
+    print(paste("    ",distribNames[i],":",sep = ""))
+    print("        importance:")
+    print(all_res[[i]][[1]])
+    print("        correllation:")
+    print(all_res[[i]][[1]])
+    print("-----")
+  }
+  flagsData <- data.frame(area = areas, badness = 0)
+  for(i in 1:(length(shapRes) - 1)){
+    df <- all_res[[i]][[3]]
+    for(j in 1:(ncol(df) - 1)){
+      if(sum(df[,j+1]) > 0){
+        flagsData$badness <- flagsData$badness + df[,j+1] * (1000 / (ncol(df) - 1))
+        flagsData[,paste(distribNames[i],colnames(df)[j+1],sep = "_")] <- NA
+        wh <- which(df[,j+1] > 0)
+        flagsData[,paste(distribNames[i],colnames(df)[j+1],sep = "_")][wh] <- paste("is above",df[wh,j+1],"standard deviation(s) for characteristic",distribNames[i],"explained by",colnames(df)[j+1],sep = " ")
+      }
+    }
+  }
+  return(flagsData)
+}
+
+
+j = 1
+
+shapRes = testa
+areas = paste("Dummy",1:20,sep = "_")
+
+test <- flagSHAP(testa, areas)
+View(test)
+readFlags(test)
+
+all_res[[1]][[3]]
+
+flagSHAPOne(testa[[1]])
+
+flags = test
+
+
+i = 4
+
+floor(abs(model$residuals) / sd(model$residuals))
+
+as.data.frame(shapValues)
+
+
+
+
+
+#####################################################################################
+#####################################################################################
+#####################################################################################
+#####################################################################################
+#####################################################################################
+#####################################################################################
+#####################################################################################
+#####################################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 dataWY <- loadArea("west-yorkshire",2020,folderIn,farea)
 moments <- makeMoments(dataWY, "MSOA11CD", "incomeH")
 momentsWY <- formatFeat(moments, normalised = TRUE)

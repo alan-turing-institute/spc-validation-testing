@@ -33,6 +33,8 @@ clusterMapping(test,"MSOA11CD")
 clusterMapping(testa,"MSOA11CD")
 clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "moments", height = "find", width = 100, skip = 3)
 clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "labels", height = "find", width = 100, skip = 3)
+clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "age", scale = "MSOA11CD", title = "moments", height = "find", width = 100, skip = 3)
+clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "age", scale = "MSOA11CD", title = "labels", height = "find", width = 100, skip = 3)
 testb <- extractCluster(momentsWY, nclust = 10)
 clusterCaracFeature(testb, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "moments_more", height = "find", width = 100, skip = 3)
 clusterCarac(test, folderOut, fplot, title = "moments")
@@ -51,6 +53,7 @@ cat_vars <- colnames(data)[c(7,13,17,18,20,21)]
 
 flagKeys <- data.frame(name = "Key1", explanation = "belongs to a small cluster")
 flagKeys <- rbind(flagKeys, data.frame(name = "Key2", explanation = "belongs to a minority cluster for labels"))
+flagKeys <- rbind(flagKeys, data.frame(name = "X_Y", explanation = "further than that number of SD for characteristic X explained by Y"))
 flagKeys
 
 readFlags(flags, map = T, scale = "MSOA11CD")
@@ -70,6 +73,7 @@ readFlags(flags, map = T, scale = "MSOA11CD")
 ##### 4. track down where SHAP values are inconsistent !! + Possibility to run indicators for a specific MSOA
 
 ##### 5. Convert and export flagged output as JSON
+########## 5.1 Change colours in flag map + 500-bins instead of1000?
 
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ #
 # |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #

@@ -23,9 +23,9 @@ install.packages(c('igraph','readxl','geojsonR','geosphere','tidyr','xgboost','s
 # https://cran.r-project.org/bin/windows/Rtools/
 install.packages(c('remotes','R.utils'))
 library(remotes)
-library(R.utils)
 remotes::install_github("NorskRegnesentral/shapr")
 
+library(R.utils)
 library(igraph)
 library(readxl)
 library(geojsonR)
@@ -107,7 +107,7 @@ preds <- prepareLabels("west-yorkshire", 2020, "MSOA11CD", folderIn, fdl, fproc)
 cor(preds[,-c(1)])
 # Variables to be included in the analysis (default is all):
 colnames(preds)
-columnsPreds <- colnames(preds)[c(2,5:(length(colnames(preds)) - 1))]
+columnsPreds <- colnames(preds)[c(2,5,6,8:(length(colnames(preds)) - 1))]
 
 # test <- runSHAP(
 #                 area_name,
@@ -132,6 +132,10 @@ test4 <- runSHAP("west-yorkshire", 2020, "MSOA11CD", "incomeH", 20, data = dataW
 testa <- runSHAP2.3("west-yorkshire", 2020, "MSOA11CD", "incomeH", 20, predNames = columnsPreds)
 
 plot(testa[[1]], index_x_explain = 1:10)
+plot(testa[[1]], index_x_explain = 1:10, bar_plot_phi0 = FALSE)
+
+plot(testa[[1]], plot_type = "beeswarm")
+
 
 info <- testa[[5]]
 png(file=file.path(folderOut,fplot,paste(info[1], info[2], info[3], info[4], info[5], "feature_importance_beeswarm.png", sep = "-")), width=1250, height=1000)

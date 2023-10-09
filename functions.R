@@ -567,7 +567,13 @@ runSHAP2.3 <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD
   row.names(moments) <- 1:nrow(moments)
   # Run SHAP
   print("Running SHAP...")
-  testSet <- sample(1:l, ntrain)
+  if(length(ntrain) == 1){
+    testSet <- sample(1:l, ntrain)
+  } else if(length(ntrain) > 1){
+    testSet <- ntrain
+  } else{
+    stop("ntrain must be a number (test sample size) of an index vector (rows to be used as test sample)")
+  }
   x_train <- as.matrix(predictors[-testSet,2:ncol(predictors)])
   y_train_mean <- moments[-testSet, "mean"]
   y_train_sd <- moments[-testSet, "sd"]
@@ -1023,6 +1029,64 @@ clusterMapping <- function(cluster, scale = c("LSOA11CS","MSOA11CD","LAD20CD")){
                 theme_void() +
                 coord_map()
   return(g)
+}
+
+
+#############################
+#############################
+####### Area flagging #######
+#############################
+#############################
+
+
+flagSHAPOne <- function(shapRes,imp1th = 0.2,imp2th = 0.1,corth = 0.3){
+  shapValues <- as.data.frame(shapRes$shapley_values)
+  shapFeatures <- shapRes$pred_explain
+  importance <- colSums(abs(shapValues))[-1]
+  importance1 <- importance / mean(shapFeatures)
+  importance2 <- importance / max(importance)
+  #
+  cors <- NULL
+  for(i in colnames(shapValues)[-1]){
+    cors <- c(cors,cor(shapValues[,i],shapFeatures))
+  }
+  names(cors) <- names(importance)
+  df <- data.frame(feat = 1:length(shapFeatures))
+  wh <- which(importance1 >= imp1th & importance2 > imp2th & cors > corth)
+  for(i in wh){
+    model <- lm(shapValues[,i] ~ shapFeatures)
+    df[,colnames(shapValues)[i+1]] <- floor(abs(model$residuals) / sd(model$residuals))
+  }
+  return(list(importance,cors,df))
+}
+
+flagSHAP <- function(shapRes,areas,imp1th = 0.2,imp2th = 0.1,corth = 0.3,distribNames=c("Mean","Sd","Skewness","Kurtosis")){
+  all_res <- rep(list(NULL),length(shapRes) - 1)
+  for(i in 1:(length(shapRes) - 1)){
+    all_res[[i]] <- flagSHAPOne(shapRes[[i]],imp1th = 0.2,imp2th = 0.1,corth = 0.3)
+  }
+  print("Summary:")
+  for(i in 1:(length(shapRes) - 1)){
+    print(paste("    ",distribNames[i],":",sep = ""))
+    print("        importance:")
+    print(all_res[[i]][[1]])
+    print("        correllation:")
+    print(all_res[[i]][[1]])
+    print("-----")
+  }
+  flagsData <- data.frame(area = areas, badness = 0)
+  for(i in 1:(length(shapRes) - 1)){
+    df <- all_res[[i]][[3]]
+    for(j in 1:(ncol(df) - 1)){
+      if(sum(df[,j+1]) > 0){
+        flagsData$badness <- flagsData$badness + df[,j+1] * (1000 / (ncol(df) - 1))
+        flagsData[,paste(distribNames[i],colnames(df)[j+1],sep = "_")] <- NA
+        wh <- which(df[,j+1] > 0)
+        flagsData[,paste(distribNames[i],colnames(df)[j+1],sep = "_")][wh] <- paste("is above",df[wh,j+1],"standard deviation(s) for characteristic",distribNames[i],"explained by",colnames(df)[j+1],sep = " ")
+      }
+    }
+  }
+  return(flagsData)
 }
 
 readFlagsLine <- function(v){
