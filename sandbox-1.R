@@ -25,6 +25,7 @@ testa <- runSHAP2.3("west-yorkshire", 2020, "MSOA11CD", "incomeH", 20, predNames
 plot(testa[[1]], index_x_explain = 1:10)
 plot(testa[[1]], index_x_explain = 1:10, bar_plot_phi0 = FALSE)
 
+png
 plot(testa[[1]], plot_type = "beeswarm")
 
 temp <- testa[[1]]

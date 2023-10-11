@@ -1,4 +1,3 @@
-
 areas <- unique(lu$AzureRef[lu$Country == "England"])
 length(areas)
 
@@ -39,14 +38,62 @@ testb <- extractCluster(momentsWY, nclust = 10)
 clusterCaracFeature(testb, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "moments_more", height = "find", width = 100, skip = 3)
 clusterCarac(test, folderOut, fplot, title = "moments")
 clusterCarac(testa, folderOut, fplot, title = "labels")
+#
+#
+#
+train <- rep(list(NULL),10)
+for(i in 1:9){
+  train[[i]] <- (i-1)*30 + 1:30
+}
+train[[10]] <- 271:299
+
+plot(shapRes[[1]], index_x_explain = 1:10)
+plot(shapRes[[1]], index_x_explain = 1:10, bar_plot_phi0 = FALSE)
+
+png(file=file.path(folderOut,fplot,paste(title, "beeswarm_", variable_name, ".png", sep = "")), width= 300, height=1025/5)
+plot(shapRes[[1]], plot_type = "beeswarm", cex = 1)
+dev.off()
+
+shapRes <- runSHAP2.3("west-yorkshire", 2020, "MSOA11CD", "incomeH", ntrain = train[[1]], predNames = columnsPreds, data = dataWY)
+SHAP_flags <- flagSHAP(shapRes,areas = sort(unique(dataWY$MSOA11CD))[train[[1]]])
+
+warnings()
+for(i in 2:10){
+  shapRes <- runSHAP2.3("west-yorkshire", 2020, "MSOA11CD", "incomeH", ntrain = train[[i]], predNames = columnsPreds, data = dataWY)
+  SHAP_flags2 <- flagSHAP(shapRes,areas = sort(unique(dataWY$MSOA11CD))[train[[i]]])
+  SHAP_flags <- dplyr::bind_rows(SHAP_flags, SHAP_flags2)
+  print("**********")
+  print(paste(i,"/10",sep = ''))
+  print("**********")
+}
+
+mergeFlags <- function(flag1,flag2,weight = 1){
+  flag1 <- flag1[order(flag1$area),]
+  rownames(flag1) <- 1:nrow(flag1)
+  flag2 <- flag2[order(flag2$area),]
+  rownames(flag2) <- 1:nrow(flag2)
+  flag_res <- data.frame(area = flag2$area)
+  flag_res$badness <- weight * flag1$badness + flag2$badness
+  flag_res <- cbind(flag_res,flag1[,3:ncol(flag1)])
+  flag_res <- cbind(flag_res,flag2[,3:ncol(flag2)])
+  return(flag_res)
+}
+
+all_flags <- mergeFlags(interWY$flags,SHAP_flags, weight = 6)
+
+readFlags(all_flags, over = 8000)
+readFlags(all_flags, map = T, scale = "MSOA11CD")
+
 
 ##### Variable analysis #####
 
 num_vars <- colnames(data)[c(5,22,31)]
 
+
 # + add categorical variables
 
 cat_vars <- colnames(data)[c(7,13,17,18,20,21)]
+
 
 ##### Temporal analysis: not available yet #####
 

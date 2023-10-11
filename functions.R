@@ -515,7 +515,9 @@ runSHAP2.3 <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD
   if(is.null(data)){
     data <- loadArea(area_name,date,folderIn,farea)
   }
-  data <- merge(data,lu[,c("OA11CD","LSOA11CD","MSOA11CD","LAD20CD")], by.x = "OA11CD", by.y = "OA11CD", all.x = T)
+  if(is.null(data[,scale]))(
+    data <- merge(data,lu[,c("OA11CD","LSOA11CD","MSOA11CD","LAD20CD")], by.x = "OA11CD", by.y = "OA11CD", all.x = T)
+  )
   predictions <- data[,c(variable_name,scale)]
   # Load predictors
   if(is.null(predictors)){
@@ -581,13 +583,13 @@ runSHAP2.3 <- function(area_name, date, scale = c("LSOA11CD","MSOA11CD","LAD20CD
   y_train_kurt <- moments[-testSet, "kurtosis"]
   x_test <- as.matrix(predictors[testSet, 2:ncol(predictors)])
   model <- xgboost(data = x_train,label = y_train_mean,nround = 20,verbose = FALSE)
-  explanation_mean <- explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_mean))
+  explanation_mean <- shapr::explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_mean))
   model <- xgboost(data = x_train,label = y_train_sd,nround = 20,verbose = FALSE)
-  explanation_sd <- explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_sd))
+  explanation_sd <- shapr::explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_sd))
   model <- xgboost(data = x_train,label = y_train_skew,nround = 20,verbose = FALSE)
-  explanation_skew <- explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_skew))
+  explanation_skew <- shapr::explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_skew))
   model <- xgboost(data = x_train,label = y_train_kurt,nround = 20,verbose = FALSE)
-  explanation_kurt <- explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_kurt))
+  explanation_kurt <- shapr::explain(model = model, x_explain = x_test, x_train = x_train, approach = "empirical", prediction_zero = mean(y_train_kurt))
   return(list(explanation_mean,explanation_sd,explanation_skew,explanation_kurt,c(area_name, date, scale, variable_name, seed)))
 }
 
@@ -1071,7 +1073,7 @@ flagSHAP <- function(shapRes,areas,imp1th = 0.2,imp2th = 0.1,corth = 0.3,distrib
     print("        importance:")
     print(all_res[[i]][[1]])
     print("        correllation:")
-    print(all_res[[i]][[1]])
+    print(all_res[[i]][[2]])
     print("-----")
   }
   flagsData <- data.frame(area = areas, badness = 0)
@@ -1098,9 +1100,10 @@ readFlagsLine <- function(v){
   }
 }
 
-readFlags <- function(flags, map = F, scale = NA){
+readFlags <- function(flags, map = F, scale = NA, over = 0, under = 50000){
   mm <- max(flags$badness)
   ref <- rev(0:floor((mm - 1) / 1000))
+  ref <- ref[ref >= over/1000 & ref <= under/1000]
   for(i in ref){
     print(paste("Badness over ", i*1000 ,":", sep = ""))
     bad_areas <- flags$area[flags$badness > i*1000 & flags$badness <= (i + 1)*1000]
@@ -1110,7 +1113,7 @@ readFlags <- function(flags, map = F, scale = NA){
     }
   }
   if(map == T){
-    cols <- viridis(length(ref))
+    cols <- heat.colors(length(ref))
     spdf_fortified <- NULL
     if(scale == "MSOA11CD"){
       if(!(file.exists(file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson")))){
