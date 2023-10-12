@@ -926,22 +926,35 @@ extractCluster <- function(feat, nclust, format = FALSE, normalised = FALSE, col
   return(ccs)
 }
 
-clusterCarac <- function(cluster, folderOut, fplot, title = NA, breaks = 10, freqOpt = T){
+clusterCarac <- function(cluster, folderOut, fplot, title = NA, breaks = 10, freqOpt = T,pdf = F){
   cols <- viridis(length(cluster))
   nrows = length(cluster)
   ncols = ncol(cluster[[1]])
-  png(file=file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")), width=200*ncols, height=200*nrows)
-  par(mfrow = c(nrows, ncols))
-  for(i in 1:nrows){
-    for(j in 1:ncols){
-      hist(cluster[[i]][,j], breaks, xlim = c(0,max(1,max(cluster[[i]][,j]))), col = cols[i], freq = freqOpt, main = paste("Cluster ", i, "; ", names(cluster[[i]][j]), sep = ""), xlab = "")
+  if(pdf == F){
+    png(file=file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")), width=200*ncols, height=200*nrows)
+    par(mfrow = c(nrows, ncols))
+    for(i in 1:nrows){
+      for(j in 1:ncols){
+        hist(cluster[[i]][,j], breaks, xlim = c(0,max(1,max(cluster[[i]][,j]))), col = cols[i], freq = freqOpt, main = paste("Cluster ", i, "; ", names(cluster[[i]][j]), sep = ""), xlab = "")
+      }
     }
+    dev.off()
+    print(paste("Saved in", file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")),sep = " "))
   }
-  dev.off()
-  print(paste("Saved in", file.path(folderOut,fplot,paste(title,"clusters_content.png",sep = "_")),sep = " "))
+  if(pdf == T){
+    pdf(file=file.path(folderOut,fplot,paste(title,"clusters_content.pdf",sep = "_")), width=2.5*ncols, height=2.5*nrows)
+    par(mfrow = c(nrows, ncols))
+    for(i in 1:nrows){
+      for(j in 1:ncols){
+        hist(cluster[[i]][,j], breaks, xlim = c(0,max(1,max(cluster[[i]][,j]))), col = cols[i], freq = freqOpt, main = paste("Cluster ", i, "; ", names(cluster[[i]][j]), sep = ""), xlab = "")
+      }
+    }
+    dev.off()
+    print(paste("Saved in", file.path(folderOut,fplot,paste(title,"clusters_content.pdf",sep = "_")),sep = " "))
+  }
 }
 
-clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, scale, title = NA, skip = 0, breaks = 10, height = "find", width = "find", res = 400){
+clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, scale, title = NA, skip = 0, breaks = 10, pdf = F, height = "find", width = "find", res = 400){
   a <- c(1,1,1,2,2,2,2,2,3,2,3,3,3,3,3,4,4,4,4,4,4,4,4,4,5)
   b <- c(1,2,3,2,3,3,4,4,3,5,4,4,5,5,5,4,5,5,5,5,6,6,6,6,5)
   if(length(cluster) > 25){
@@ -963,36 +976,70 @@ clusterCaracFeature <- function(cluster, folderOut, fplot, data, variable_name, 
     }
   }
   data <- data[data$skip == F,]
-  png(file=file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".png", sep = "")), width= res*ncols, height=res*nrows)
-  par(mfrow = c(nrows, ncols))
-  for(i in 1:length(cluster)){
-    dataTemp <- data[data$cluster == i,]
-    ref <- unique(dataTemp[,scale])
-    MX <- matrix(NA, nrow = length(ref), ncol = 2*breaks)
-    MY <- matrix(NA, nrow = length(ref), ncol = 2*breaks)
-    
-    for(j in 1:length(ref)){
-      h <- hist(data[data[,scale] == ref[j], variable_name], breaks = breaks, plot = F)
-      MX[j,1:length(h$mids)] <- h$mids
-      MY[j,1:length(h$density)] <- h$density
+  if(pdf == F){
+    png(file=file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".png", sep = "")), width= res*ncols, height=res*nrows)
+    par(mfrow = c(nrows, ncols))
+    for(i in 1:length(cluster)){
+      dataTemp <- data[data$cluster == i,]
+      ref <- unique(dataTemp[,scale])
+      MX <- matrix(NA, nrow = length(ref), ncol = 2*breaks)
+      MY <- matrix(NA, nrow = length(ref), ncol = 2*breaks)
+      
+      for(j in 1:length(ref)){
+        h <- hist(data[data[,scale] == ref[j], variable_name], breaks = breaks, plot = F)
+        MX[j,1:length(h$mids)] <- h$mids
+        MY[j,1:length(h$density)] <- h$density
+      }
+      if(height == "find"){
+        h <- max(MY, na.rm = T) * 1.1
+      } else{
+        h <- height
+      }
+      if(width == "find"){
+        w <- max(MX, na.rm = T) * 1.1
+      } else{
+        w <- width
+      }
+      plot(MX[1,],MY[1,], ylim = c(0,h), xlim = c(0,w), pch = NA, main = paste("Cluster", i, sep = " "), ylab = "frequency", xlab = variable_name)
+      for(j in 1:length(ref)){
+        lines(MX[j,], MY[j,], col = alpha(cols[i], 0.5))
+      }
     }
-    if(height == "find"){
-      h <- max(MY, na.rm = T) * 1.1
-    } else{
-      h <- height
-    }
-    if(width == "find"){
-      w <- max(MX, na.rm = T) * 1.1
-    } else{
-      w <- width
-    }
-    plot(MX[1,],MY[1,], ylim = c(0,h), xlim = c(0,w), pch = NA, main = paste("Cluster", i, sep = " "), ylab = "frequency", xlab = variable_name)
-    for(j in 1:length(ref)){
-      lines(MX[j,], MY[j,], col = alpha(cols[i], 0.5))
-    }
+    dev.off()
+    print(paste("Saved in", file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".png", sep = "")), sep = " "))
   }
-  dev.off()
-  print(paste("Saved in", file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".png", sep = "")), sep = " "))
+  if(pdf == T){
+    pdf(file=file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".pdf", sep = "")), width= 2.5*ncols, height=2.5*nrows)
+    par(mfrow = c(nrows, ncols))
+    for(i in 1:length(cluster)){
+      dataTemp <- data[data$cluster == i,]
+      ref <- unique(dataTemp[,scale])
+      MX <- matrix(NA, nrow = length(ref), ncol = 2*breaks)
+      MY <- matrix(NA, nrow = length(ref), ncol = 2*breaks)
+      
+      for(j in 1:length(ref)){
+        h <- hist(data[data[,scale] == ref[j], variable_name], breaks = breaks, plot = F)
+        MX[j,1:length(h$mids)] <- h$mids
+        MY[j,1:length(h$density)] <- h$density
+      }
+      if(height == "find"){
+        h <- max(MY, na.rm = T) * 1.1
+      } else{
+        h <- height
+      }
+      if(width == "find"){
+        w <- max(MX, na.rm = T) * 1.1
+      } else{
+        w <- width
+      }
+      plot(MX[1,],MY[1,], ylim = c(0,h), xlim = c(0,w), pch = NA, main = paste("Cluster", i, sep = " "), ylab = "frequency", xlab = variable_name)
+      for(j in 1:length(ref)){
+        lines(MX[j,], MY[j,], col = alpha(cols[i], 0.5))
+      }
+    }
+    dev.off()
+    print(paste("Saved in", file.path(folderOut,fplot,paste(title, "_clusters_content_variable_", variable_name, ".pdf", sep = "")), sep = " "))
+  }
 }
 
 clusterMapping <- function(cluster, scale = c("LSOA11CS","MSOA11CD","LAD20CD")){

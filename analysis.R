@@ -12,6 +12,11 @@ prepareLabels("west-yorkshire", 2020, "LSOA11CD", folderIn, fdl, fproc)
 prepareLabels("west-yorkshire", 2020, "LAD20CD", folderIn, fdl, fproc)
 
 
+pdf(width = 10, height = 7.5)
+plot(1:10,1:10)
+dev.off()
+
+
 ### MSOA11CD
 
 dataWY <- loadArea("west-yorkshire",2020,folderIn,farea)
@@ -30,14 +35,14 @@ test <- extractCluster(momentsWY, nclust = 5)
 testa <- extractCluster(labelsWY, nclust = 5)
 clusterMapping(test,"MSOA11CD")
 clusterMapping(testa,"MSOA11CD")
-clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "moments", height = "find", width = 100, skip = 3)
-clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "labels", height = "find", width = 100, skip = 3)
-clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "age", scale = "MSOA11CD", title = "moments", height = "find", width = 100, skip = 3)
-clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "age", scale = "MSOA11CD", title = "labels", height = "find", width = 100, skip = 3)
+clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "moments", height = "find", width = 100, skip = 3,pdf = T)
+clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "labels", height = "find", width = 100, skip = 3,pdf = T)
+clusterCaracFeature(test, folderOut, fplot, data = dataWY, variable_name = "age", scale = "MSOA11CD", title = "moments", height = "find", width = 100, skip = 3,pdf = T)
+clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "age", scale = "MSOA11CD", title = "labels", height = "find", width = 100, skip = 3,pdf = T)
 testb <- extractCluster(momentsWY, nclust = 10)
-clusterCaracFeature(testb, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "moments_more", height = "find", width = 100, skip = 3)
-clusterCarac(test, folderOut, fplot, title = "moments")
-clusterCarac(testa, folderOut, fplot, title = "labels")
+clusterCaracFeature(testb, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "moments_more", height = "find", width = 100, skip = 3,pdf = T)
+clusterCarac(test, folderOut, fplot, title = "moments", pdf = T)
+clusterCarac(testa, folderOut, fplot, title = "labels", pdf = T)
 #
 #
 #
@@ -51,6 +56,10 @@ plot(shapRes[[1]], index_x_explain = 1:10)
 plot(shapRes[[1]], index_x_explain = 1:10, bar_plot_phi0 = FALSE)
 
 png(file=file.path(folderOut,fplot,paste(title, "beeswarm_", variable_name, ".png", sep = "")), width= 300, height=1025/5)
+plot(shapRes[[1]], plot_type = "beeswarm", cex = 1)
+dev.off()
+
+pdf(file=file.path(folderOut,fplot,paste(title, "beeswarm_", variable_name, ".pdf", sep = "")), width= 3, height=10.75/5)
 plot(shapRes[[1]], plot_type = "beeswarm", cex = 1)
 dev.off()
 
