@@ -1,3 +1,5 @@
+library(gridExtra)
+
 areas <- unique(lu$AzureRef[lu$Country == "England"])
 length(areas)
 
@@ -76,18 +78,6 @@ for(i in 2:10){
   print("**********")
 }
 
-mergeFlags <- function(flag1,flag2,weight = 1){
-  flag1 <- flag1[order(flag1$area),]
-  rownames(flag1) <- 1:nrow(flag1)
-  flag2 <- flag2[order(flag2$area),]
-  rownames(flag2) <- 1:nrow(flag2)
-  flag_res <- data.frame(area = flag2$area)
-  flag_res$badness <- weight * flag1$badness + flag2$badness
-  flag_res <- cbind(flag_res,flag1[,3:ncol(flag1)])
-  flag_res <- cbind(flag_res,flag2[,3:ncol(flag2)])
-  return(flag_res)
-}
-
 all_flags <- mergeFlags(interWY$flags,SHAP_flags, weight = 6)
 
 readFlags(all_flags, over = 8000)
@@ -120,16 +110,23 @@ readFlags(flags, map = T, scale = "MSOA11CD")
 ##### 2. characterise clusters
 ########## 2.1 Fix last function; indexing is obviously wrong
 ########## 2.2 Write explicit outlier detection
+##### 3. check global SHAP values
+##### 4. track down where SHAP values are inconsistent
+##### 5. write code to run indicators for a specific MSOA
+########## 5.1 distributions
 
 # |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #
 # |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv #
 
-##### 3. check global SHAP values
-##### 4. track down where SHAP values are inconsistent !! + Possibility to run indicators for a specific MSOA
+##### 5. write code to run indicators for a specific MSOA
+########## 5.2 maps
+##### 6. global evaluation
+########## 6.1 spatial autocorrelation
+########## 6.2 max purity summary
+##### 7. convert and export flagged output as JSON
 
-##### 5. Convert and export flagged output as JSON
-########## 5.1 Change colours in flag map + 500-bins instead of1000?
+##### 8. Distribution reshaping
 
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ #
 # |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #

@@ -832,8 +832,8 @@ clustMatching <- function(feat1, feat2, nclust, nclust2 = nclust, skip = floor(0
           clust2 <- which(sapply(lapply(ccs2, function(x){grep(area, x)}), function(x){length(x) > 0}))
           percent <- res2[i,clust2]
           if(percent < max(res2[i,])){
-            flagsData$key2[flagsData$area == area] <- paste("belongs to cluster", clust2, "of", name2, "with only", percent, "% of such areas", sep = " ")
-            flagsData$badness[flagsData$area == area] <- flagsData$badness[flagsData$area == area] + round(10 * (100 - percent))
+            flagsData$key2[flagsData$area == area] <- paste("belongs to cluster", clustind2[clust2], "of", name2, "with only", percent, "% of such areas", sep = " ")
+            flagsData$badness[flagsData$area == area] <- flagsData$badness[flagsData$area == area] + round(20 * (50 - percent))
           }
         }
       }
@@ -905,6 +905,22 @@ makeMoments <- function(data,scale = c("LSOA11CD","MSOA11CD","LAD20CD"),variable
   moments <- moments[order(moments[,scale]),]
   row.names(moments) <- 1:nrow(moments)
   print("Done")
+  return(moments)
+}
+
+# Same but assumes scale already exists
+makeMoments2 <- function(data,scale = c("LSOA11CD","MSOA11CD","LAD20CD"),variable_name){
+  new_area_list <- unique(data[,scale])
+  l <- length(new_area_list)
+  moments <- data.frame(area = rep(NA,l), mean = NA, sd = NA, skewness = NA, kurtosis = NA)
+  colnames(moments)[1] <- scale
+  for(i in 1:l){
+    ref <- which(data[,scale] %in% new_area_list[i] & !is.na(data[,variable_name]))
+    moments[i,1] <- new_area_list[i]
+    moments[i,2:5] <- findmoments(data[ref,variable_name], graph = FALSE)
+  }
+  moments <- moments[order(moments[,scale]),]
+  row.names(moments) <- 1:nrow(moments)
   return(moments)
 }
 
@@ -1215,3 +1231,118 @@ readFlags <- function(flags, map = F, scale = NA, over = 0, under = 50000){
       coord_map()
   }
 }
+
+mergeFlags <- function(flag1,flag2,weight = 1){
+  flag1 <- flag1[order(flag1$area),]
+  rownames(flag1) <- 1:nrow(flag1)
+  flag2 <- flag2[order(flag2$area),]
+  rownames(flag2) <- 1:nrow(flag2)
+  flag_res <- data.frame(area = flag2$area)
+  flag_res$badness <- weight * flag1$badness + flag2$badness
+  flag_res <- cbind(flag_res,flag1[,3:ncol(flag1)])
+  flag_res <- cbind(flag_res,flag2[,3:ncol(flag2)])
+  return(flag_res)
+}
+
+# It is now expected that data contains the column corresponding to the right scale
+queryArea <- function(name, flags, data, labels, scale, variable_name, nclust, nclust2 = nclust, colNames = colnames(labels)[2:ncol(labels)]){
+  readFlagsLine(flags[flags$area == name,])
+  print("---------------------------------------------------------------------------------------------------------")
+  # Get clusters
+  moments_all <- makeMoments2(data, scale, variable_name)
+  moments_all <- moments_all[order(moments_all[,scale]),]
+  row.names(moments_all) <- 1:nrow(moments_all)
+  moments_all_norm <- formatFeat(moments_all, normalised = TRUE)
+  clusters_moments <- extractCluster(moments_all_norm, nclust)
+  for(i in 1:length(clusters_moments)){
+    if(name %in% row.names(clusters_moments[[i]])){
+      cid_m <- i
+    }
+  }
+  moments_ids <- which(moments_all[,scale] %in% row.names(clusters_moments[[cid_m]]))
+  #
+  labels_all <- labels[order(labels[,scale]),]
+  row.names(labels_all) <- 1:nrow(labels_all)
+  labels_norm <- formatFeat(labels_all, normalised = TRUE, colNames)
+  clusters_labels <- extractCluster(labels_norm, nclust2)
+  for(i in 1:length(clusters_labels)){
+    if(name %in% row.names(clusters_labels[[i]])){
+      cid_l <- i
+    }
+  }
+  labels_ids <- which(labels_all[,scale] %in% row.names(clusters_labels[[cid_l]]))
+  # Distrib data
+  data_moments <- data.frame(
+    name = c("mean","sd","skewness","kurtosis"),
+    area = c(round(moments_all[moments_all[,scale] == name,2],2),round(moments_all[moments_all[,scale] == name,3],2),round(moments_all[moments_all[,scale] == name,4],2),round(moments_all[moments_all[,scale] == name,5],2)),
+    from = c(round(mean(moments_all[moments_ids,2]),2),round(mean(moments_all[moments_ids,3]),2),round(mean(moments_all[moments_ids,4]),2),round(mean(moments_all[moments_ids,5]),2)),
+    from_sd = c(round(sd(moments_all[moments_ids,2]),2),round(sd(moments_all[moments_ids,3]),2),round(sd(moments_all[moments_ids,4]),2),round(sd(moments_all[moments_ids,5]),2)),
+    labels = c(round(mean(moments_all[labels_ids,2]),2),round(mean(moments_all[labels_ids,3]),2),round(mean(moments_all[labels_ids,4]),2),round(mean(moments_all[labels_ids,5]),2)),
+    labels_sd = c(round(sd(moments_all[labels_ids,2]),2),round(sd(moments_all[labels_ids,3]),2),round(sd(moments_all[labels_ids,4]),2),round(sd(moments_all[labels_ids,5]),2))
+  )
+  # Labels data
+  labels_all_reduced <- labels_all
+  for(i in 2:ncol(labels_all_reduced )){
+    labels_all_reduced[,i] <- labels_all_reduced[,i] / 10^floor(log10(max(labels_all_reduced[,i])))
+  }
+  data_labels <- data.frame(
+    name = colNames,
+    area = unlist(unname(labels_all_reduced[labels_all_reduced[,scale] == name,colNames])),
+    all = NA,
+    all_sd = NA
+  )
+  for(i in 1:length(colNames)){
+    data_labels$all[i] = mean(labels_all_reduced[labels_ids,colNames[i]],na.rm = T)
+    data_labels$all_sd[i] = sd(labels_all_reduced[labels_ids,colNames[i]],na.rm = T)
+  }
+  # Print summary
+  print(paste("Moments for ", variable_name," are: ", data_moments$area[1], ", ", data_moments$area[2],", ", data_moments$area[3], " and ", data_moments$area[4], sep = ""))
+  print(paste("Average values for the cluster are: ", data_moments$from[1], ", ", data_moments$from[2],", ", data_moments$from[3], " and ", data_moments$from[4], sep = ""))
+  print(paste("Average values for cluster ", cid_l, " of labels are: ", data_moments$labels[1], ", ", data_moments$labels[2],", ", data_moments$labels[3], " and ", data_moments$labels[4], sep = ""))
+  y_lim <- max(c(data_moments$from + 3 * data_moments$from_sd, data_moments$labels + 3 * data_moments$labels_sd)) * 1.05
+  g1 <- ggplot(data_moments) +
+    geom_bar( aes(x=name, y=from), stat="identity", fill="skyblue", alpha=0.5) +
+    geom_errorbar( aes(x=name, ymin=from-from_sd, ymax=from+from_sd), width=0.8, colour="darkblue", alpha=0.9, size=1) +
+    geom_errorbar( aes(x=name, ymin=from-2*from_sd, ymax=from+2*from_sd), width=0.5, colour="darkblue", alpha=0.9, size=1) +
+    geom_errorbar( aes(x=name, ymin=from-3*from_sd, ymax=from+3*from_sd), width=0.2, colour="darkblue", alpha=0.9, size=1) +
+    geom_point( aes(x=name, y=area), colour="red", alpha=0.9, size=3) +
+    coord_flip() + theme(axis.title = element_blank()) + ggtitle(paste("Cluster",cid_m,"of moments",sep = " ")) + ylim(0, y_lim)
+  g2 <- ggplot(data_moments) +
+    geom_bar( aes(x=name, y=labels), stat="identity", fill="darkseagreen2", alpha=0.5) +
+    geom_errorbar( aes(x=name, ymin=labels-labels_sd, ymax=labels+labels_sd), width=0.8, colour="darkgreen", alpha=0.9, size=1) +
+    geom_errorbar( aes(x=name, ymin=labels-2*labels_sd, ymax=labels+2*labels_sd), width=0.5, colour="darkgreen", alpha=0.9, size=1) +
+    geom_errorbar( aes(x=name, ymin=labels-3*labels_sd, ymax=labels+3*labels_sd), width=0.2, colour="darkgreen", alpha=0.9, size=1) +
+    geom_point( aes(x=name, y=area), colour="red", alpha=0.9, size=3) +
+    coord_flip() + theme(axis.title = element_blank()) + ggtitle(paste("Cluster",cid_l,"of labels",sep = " ")) + ylim(0, y_lim)
+  g3 <- ggplot(data_labels) +
+    geom_bar( aes(x=name, y=all), stat="identity", fill="goldenrod2", alpha=0.5) +
+    geom_errorbar( aes(x=name, ymin=pmax(0,all-all_sd), ymax=all+all_sd), width=0.8, colour="tomato4", alpha=0.9, size=1) +
+    geom_errorbar( aes(x=name, ymin=pmax(0,all-2*all_sd), ymax=all+2*all_sd), width=0.5, colour="tomato4", alpha=0.9, size=1) +
+    geom_errorbar( aes(x=name, ymin=pmax(0,all-3*all_sd), ymax=all+3*all_sd), width=0.2, colour="tomato4", alpha=0.9, size=1) +
+    geom_point( aes(x=name, y=area), colour="red", alpha=0.9, size=3) +
+    coord_flip() + theme(axis.title = element_blank()) + ggtitle(paste("Cluster",cid_l,"of labels",sep = " "))
+  grid.arrange(g1, g2, g3, ncol=3)
+}
+
+queryArea("E02002189", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, colNames)
+
+queryArea("E02002312", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, colNames)
+
+###### Toolbox for testing ######
+# name = "E02002189"
+# flags = all_flags
+# data = dataWY
+# labels <- loadLabels("west-yorkshire",2020, "MSOA11CD")
+# scale = "MSOA11CD"
+# variable_name = "incomeH"
+# nclust = 5
+# nclust2 = 5
+# colNames = c("closeness_all","betweenness","distHPD","popDens","medAge","IMD19_ranks")
+###### Toolbox for testing ######
+
+
+
+
+
+
+
