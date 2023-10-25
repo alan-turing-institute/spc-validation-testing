@@ -1154,6 +1154,10 @@ flagSHAP <- function(shapRes,areas,imp1th = 0.2,imp2th = 0.1,corth = 0.3,distrib
   return(flagsData)
 }
 
+flagKeys <- data.frame(name = "Key1", explanation = "belongs to a small cluster")
+flagKeys <- rbind(flagKeys, data.frame(name = "Key2", explanation = "belongs to a minority cluster for labels"))
+flagKeys <- rbind(flagKeys, data.frame(name = "X_Y", explanation = "further than that number of SD for characteristic X explained by Y"))
+
 readFlagsLine <- function(v){
   print(paste(v[1], "| Total badness:", v[2], sep = " "))
   pbs <- v[2 + which(!is.na(v[3:length(v)]))]
@@ -1395,14 +1399,8 @@ queryArea <- function(name, flags, data, labels, scale, variable_name, nclust, n
       coord_map()
     grid.arrange(g1, g2, g3, g4, g5, g6, ncol=3)
   }
-  
 }
 
-dev.off()
-
-queryArea("E02002189", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, colNames)
-
-queryArea("E02002312", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, colNames)
 
 ###### Toolbox for testing ######
 # name = "E02002189"
@@ -1415,10 +1413,3 @@ queryArea("E02002312", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, c
 # nclust2 = 5
 # colNames = c("closeness_all","betweenness","distHPD","popDens","medAge","IMD19_ranks")
 ###### Toolbox for testing ######
-
-
-nclust = 5
-nclust2 = 5
-
-
-which(data_json@data$MSOA11CD == name)
