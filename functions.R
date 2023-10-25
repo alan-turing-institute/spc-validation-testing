@@ -1245,7 +1245,7 @@ mergeFlags <- function(flag1,flag2,weight = 1){
 }
 
 # It is now expected that data contains the column corresponding to the right scale
-queryArea <- function(name, flags, data, labels, scale, variable_name, nclust, nclust2 = nclust, colNames = colnames(labels)[2:ncol(labels)]){
+queryArea <- function(name, flags, data, labels, scale, variable_name, nclust, nclust2 = nclust, colNames = colnames(labels)[2:ncol(labels), maps = T]){
   readFlagsLine(flags[flags$area == name,])
   print("---------------------------------------------------------------------------------------------------------")
   # Get clusters
@@ -1321,8 +1321,84 @@ queryArea <- function(name, flags, data, labels, scale, variable_name, nclust, n
     geom_errorbar( aes(x=name, ymin=pmax(0,all-3*all_sd), ymax=all+3*all_sd), width=0.2, colour="tomato4", alpha=0.9, size=1) +
     geom_point( aes(x=name, y=area), colour="red", alpha=0.9, size=3) +
     coord_flip() + theme(axis.title = element_blank()) + ggtitle(paste("Cluster",cid_l,"of labels",sep = " "))
-  grid.arrange(g1, g2, g3, ncol=3)
+  if(maps == F){
+    grid.arrange(g1, g2, g3, ncol=3)
+  } else{
+    col1 <- viridis(nclust)
+    col2 <- viridis(nclust2)
+    spdf_fortified <- NULL
+    if(scale == "MSOA11CD"){
+      if(!(file.exists(file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson")))){
+        print("Downloading geojson at MSOA scale...")
+        download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/MSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"))
+      }
+      data_json <- geojson_read(file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"), what = "sp")
+      moments_areas <- moments_all[moments_ids,scale]
+      labels_areas <- labels_all[labels_ids,scale]
+      if(length(moments_areas) > 0){
+        spdf_region <- data_json[!(data_json@data$MSOA11CD %in% moments_areas) & (data_json@data$MSOA11CD %in% moments_all[,scale]),]
+        spdf_fortified_temp <- tidy(spdf_region)
+        spdf_fortified_temp$col <- "grey"
+        spdf_region2 <- data_json[(data_json@data$MSOA11CD %in% moments_areas) & data_json@data$MSOA11CD != name,]
+        spdf_fortified_temp2 <- tidy(spdf_region2)
+        spdf_fortified_temp2$col <- col1[cid_m]
+        spdf_region3 <- data_json[data_json@data$MSOA11CD == name,]
+        spdf_fortified_temp3 <- tidy(spdf_region3)
+        spdf_fortified_temp3$col <- "red"
+        spdf_fortified_moments <- rbind(spdf_fortified,spdf_fortified_temp,spdf_fortified_temp2,spdf_fortified_temp3)
+      }
+      if(length(labels_areas) > 0){
+        spdf_region <- data_json[!(data_json@data$MSOA11CD %in% labels_areas) & (data_json@data$MSOA11CD %in% labels_all[,scale]),]
+        spdf_fortified_temp <- tidy(spdf_region)
+        spdf_fortified_temp$col <- "grey"
+        spdf_region2 <- data_json[(data_json@data$MSOA11CD %in% labels_areas) & data_json@data$MSOA11CD != name,]
+        spdf_fortified_temp2 <- tidy(spdf_region2)
+        spdf_fortified_temp2$col <- col1[cid_l]
+        spdf_region3 <- data_json[data_json@data$MSOA11CD == name,]
+        spdf_fortified_temp3 <- tidy(spdf_region3)
+        spdf_fortified_temp3$col <- "red"
+        spdf_fortified_labels <- rbind(spdf_fortified,spdf_fortified_temp,spdf_fortified_temp2,spdf_fortified_temp3)
+      }
+    } else if(scale == "LSOA11CD"){
+      if(!(file.exists(file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson")))){
+        print("Downloading geojson at LSOA scale...")
+        download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/LSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"))
+      }
+      data_json <- geojson_read(file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"), what = "sp")
+      non_bad_areas <- flags$area[flags$badness < 1]
+      if(length(non_bad_areas) > 0){
+        spdf_region = data_json[data_json@data$MSOA11CD %in% non_bad_areas,]
+        spdf_fortified_temp <- tidy(spdf_region)
+        spdf_fortified_temp$col <- "grey"
+        spdf_fortified <- rbind(spdf_fortified,spdf_fortified_temp)
+      }
+      for(i in 1:length(ref)){
+        bad_areas <- flags$area[flags$badness > ref[i]*1000 & flags$badness <= (ref[i] + 1)*1000]
+        if(length(bad_areas) > 0){
+          spdf_region = data_json[data_json@data$LSOA11CD %in% bad_areas,]
+          spdf_fortified_temp <- tidy(spdf_region)
+          spdf_fortified_temp$col <- cols[i]
+          spdf_fortified <- rbind(spdf_fortified,spdf_fortified_temp)
+        }
+      }
+    } else if(scale == "LAD20CD"){
+      stop("Coming soon")
+    }
+    g4 <- ggplot() +
+      geom_polygon(data = spdf_fortified_moments, aes( x = long, y = lat, group = group), fill=spdf_fortified_moments$col, color="white") +
+      theme_void() + ggtitle(paste("Cluster",cid_m,"of moments",sep = " ")) +
+      coord_map()
+    g5 <- NULL
+    g6 <- ggplot() +
+      geom_polygon(data = spdf_fortified_labels, aes( x = long, y = lat, group = group), fill=spdf_fortified_labels$col, color="white") +
+      theme_void() + ggtitle(paste("Cluster",cid_l,"of labels",sep = " ")) +
+      coord_map()
+    grid.arrange(g1, g2, g3, g4, g5, g6, ncol=3)
+  }
+  
 }
+
+dev.off()
 
 queryArea("E02002189", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, colNames)
 
@@ -1341,8 +1417,8 @@ queryArea("E02002312", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, c
 ###### Toolbox for testing ######
 
 
+nclust = 5
+nclust2 = 5
 
 
-
-
-
+which(data_json@data$MSOA11CD == name)

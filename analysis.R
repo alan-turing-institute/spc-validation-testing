@@ -120,7 +120,7 @@ readFlags(flags, map = T, scale = "MSOA11CD")
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv #
 
 ##### 5. write code to run indicators for a specific MSOA
-########## 5.2 maps
+########## 5.2 maps -- optimise speed with parallel fortify
 ##### 6. global evaluation
 ########## 6.1 spatial autocorrelation
 ########## 6.2 max purity summary
