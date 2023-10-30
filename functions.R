@@ -1167,7 +1167,7 @@ readFlagsLine <- function(v){
   }
 }
 
-readFlags <- function(flags, map = F, scale = NA, over = 0, under = 50000){
+readFlags <- function(flags, map = F, scale = NA, over = 0, under = 50000, allClear = "#d2f760ff"){
   mm <- max(flags$badness)
   ref <- rev(0:floor((mm - 1) / 1000))
   ref <- ref[ref >= over/1000 & ref <= under/1000]
@@ -1192,7 +1192,7 @@ readFlags <- function(flags, map = F, scale = NA, over = 0, under = 50000){
       if(length(non_bad_areas) > 0){
         spdf_region = data_json[data_json@data$MSOA11CD %in% non_bad_areas,]
         spdf_fortified_temp <- tidy(spdf_region)
-        spdf_fortified_temp$col <- "grey"
+        spdf_fortified_temp$col <- allClear
         spdf_fortified <- rbind(spdf_fortified,spdf_fortified_temp)
       }
       for(i in 1:length(ref)){
@@ -1214,7 +1214,7 @@ readFlags <- function(flags, map = F, scale = NA, over = 0, under = 50000){
       if(length(non_bad_areas) > 0){
         spdf_region = data_json[data_json@data$MSOA11CD %in% non_bad_areas,]
         spdf_fortified_temp <- tidy(spdf_region)
-        spdf_fortified_temp$col <- "grey"
+        spdf_fortified_temp$col <- allClear
         spdf_fortified <- rbind(spdf_fortified,spdf_fortified_temp)
       }
       for(i in 1:length(ref)){
