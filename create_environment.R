@@ -1,28 +1,16 @@
-# require(installr)
-# updateR()
+# Dev version of SHAPR
+install.packages('remotes')
+library(remotes)
+remotes::install_github("NorskRegnesentral/shapr")
 
-# Random sandboxes
-#install.packages(c('gamlss','gamlss.tr','gamlss.dist','gamlss.add','fitdistrplus','univariateML','R.utils','ggplot2','tidyr'))
-
-# Test XAI:
-install.packages('shapr')
-install.packages('xgboost')
-install.packages('igraph')
-install.packages('readxl')
-install.packages('geojsonR')
-install.packages('geosphere')
-install.packages('tidyr')
-install.packages('fitdistrplus')
-install.packages('R.utils')
-install.packages('ggplot2')
-install.packages('ggbeeswarm')
-
-# Test intersection (plus above):
-install.packages('scales')
-install.packages('funtimes')
-install.packages('geojsonio')
-install.packages('broom')
-install.packages('viridis')
+# Core
+install.packages(c('R.utils','igraph','readxl','geojsonio','broom','tidyr','xgboost','funtimes','fitdistrplus','ggplot2','ggbeeswarm',
+                   'geosphere','scales','viridis','gridExtra','plotly'))
+#install.packages('geojsonR')
+# Export to JSON
+install.packages('jsonlite')
+# Spatial autocorrelation
+install.packages('spdep')
 
 # Directories
 folderIn <- "Data"

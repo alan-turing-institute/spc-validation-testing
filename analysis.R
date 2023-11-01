@@ -1,27 +1,45 @@
-library(gridExtra)
+#############
+### Setup ###
+#############
+
+library(shapr)
 library(R.utils)
 library(igraph)
 library(readxl)
-library(geojsonR)
-library(geosphere)
+library(geojsonio)
+library(broom)
 library(tidyr)
 library(xgboost)
-library(shapr)
+library(funtimes)
 library(fitdistrplus)
 library(ggplot2)
 library(ggbeeswarm)
+library(geosphere)
 library(scales)
-library(funtimes)
-library(fitdistrplus)
-library(geojsonio)
-library(broom)
-library(ggplot2)
 library(viridis)
+library(gridExtra)
 library(plotly)
+#library(geojsonR)
+# Export to JSON
 library(jsonlite)
+# Spatial autocorrelation
 library(spdep)
 
 source("functions.R")
+
+folderIn <- "Data"
+fdl <- "dl"
+farea <- "area"
+folderOut <- "Output"
+fplot <- "plots"
+fproc <- "processed"
+
+dir.create(folderIn)
+dir.create(file.path(folderIn,fdl))
+dir.create(file.path(folderIn,farea))
+dir.create(file.path(folderIn,fproc))
+dir.create(folderOut)
+dir.create(file.path(folderOut,fplot))
 
 areas <- unique(lu$AzureRef[lu$Country == "England"])
 length(areas)

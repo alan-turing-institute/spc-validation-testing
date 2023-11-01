@@ -16,30 +16,30 @@
 ### Setup ###
 #############
 
-
-install.packages(c('igraph','readxl','geojsonR','geosphere','tidyr','xgboost','shapr','fitdistrplus','ggplot2','ggbeeswarm'))
-
-# To use updated version of shapr not yet on CRAN. Then, use 'runSHAP2.3' instead of 'runSHAP'.
-# https://cran.r-project.org/bin/windows/Rtools/
-install.packages(c('remotes','R.utils'))
-library(remotes)
-remotes::install_github("NorskRegnesentral/shapr")
-
+library(shapr)
 library(R.utils)
 library(igraph)
 library(readxl)
-library(geojsonR)
-library(geosphere)
+library(geojsonio)
+library(broom)
 library(tidyr)
 library(xgboost)
-library(shapr)
+library(funtimes)
 library(fitdistrplus)
 library(ggplot2)
 library(ggbeeswarm)
+library(geosphere)
+library(scales)
+library(viridis)
+library(gridExtra)
+library(plotly)
+#library(geojsonR)
+# Export to JSON
+library(jsonlite)
+# Spatial autocorrelation
+library(spdep)
 
-source('functions.R')
-
-# The seed is now randomly chosen within the function and exported to the metadata for reproducibility
+source("functions.R")
 
 folderIn <- "Data"
 fdl <- "dl"
@@ -54,6 +54,9 @@ dir.create(file.path(folderIn,farea))
 dir.create(file.path(folderIn,fproc))
 dir.create(folderOut)
 dir.create(file.path(folderOut,fplot))
+
+areas <- unique(lu$AzureRef[lu$Country == "England"])
+length(areas)
 
 downloadPrerequisites(folderIn,fdl)
 

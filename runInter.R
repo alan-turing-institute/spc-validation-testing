@@ -2,17 +2,30 @@
 ### Setup ###
 #############
 
-
-library(scales)
-library(funtimes)
-library(fitdistrplus)
-#
+library(shapr)
+library(R.utils)
+library(igraph)
+library(readxl)
 library(geojsonio)
 library(broom)
+library(tidyr)
+library(xgboost)
+library(funtimes)
+library(fitdistrplus)
 library(ggplot2)
+library(ggbeeswarm)
+library(geosphere)
+library(scales)
 library(viridis)
+library(gridExtra)
+library(plotly)
+#library(geojsonR)
+# Export to JSON
+library(jsonlite)
+# Spatial autocorrelation
+library(spdep)
 
-source('functions.R')
+source("functions.R")
 
 folderIn <- "Data"
 fdl <- "dl"
@@ -27,6 +40,9 @@ dir.create(file.path(folderIn,farea))
 dir.create(file.path(folderIn,fproc))
 dir.create(folderOut)
 dir.create(file.path(folderOut,fplot))
+
+areas <- unique(lu$AzureRef[lu$Country == "England"])
+length(areas)
 
 
 #############################
