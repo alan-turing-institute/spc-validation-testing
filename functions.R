@@ -1151,7 +1151,7 @@ flagSHAP <- function(shapRes,areas,imp1th = 0.2,imp2th = 0.1,corth = 0.3,distrib
       }
     }
   }
-  return(flagsData)
+  return(list(flagsData,all_res))
 }
 
 flagKeys <- data.frame(name = "Key1", explanation = "belongs to a small cluster")
@@ -1399,6 +1399,12 @@ queryArea <- function(name, flags, data, labels, scale, variable_name, nclust, n
       coord_map()
     grid.arrange(g1, g2, g3, g4, g5, g6, ncol=3)
   }
+}
+
+flagsToJson <- function(flags, area, date){
+  jsonData <- toJSON(flags)
+  jsonData <- prettify(jsonData)
+  write(jsonData, paste("Output/flags_",area,"_",date,".json",sep = ""))
 }
 
 

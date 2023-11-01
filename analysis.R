@@ -1,4 +1,26 @@
 library(gridExtra)
+library(R.utils)
+library(igraph)
+library(readxl)
+library(geojsonR)
+library(geosphere)
+library(tidyr)
+library(xgboost)
+library(shapr)
+library(fitdistrplus)
+library(ggplot2)
+library(ggbeeswarm)
+library(scales)
+library(funtimes)
+library(fitdistrplus)
+library(geojsonio)
+library(broom)
+library(ggplot2)
+library(viridis)
+library(plotly)
+library(jsonlite)
+
+source("functions.R")
 
 areas <- unique(lu$AzureRef[lu$Country == "England"])
 length(areas)
@@ -67,10 +89,12 @@ for(i in 1:9){
 train[[10]] <- 271:299
 #
 shapRes <- runSHAP2.3("west-yorkshire", 2020, "MSOA11CD", "incomeH", ntrain = train[[1]], predNames = columnsPreds, data = dataWY)
-SHAP_flags <- flagSHAP(shapRes,areas = sort(unique(dataWY$MSOA11CD))[train[[1]]])
+SHAP_all <- flagSHAP(shapRes,areas = sort(unique(dataWY$MSOA11CD))[train[[1]]])
+SHAP_flags <- SHAP_all[[1]]
 for(i in 2:10){
   shapRes <- runSHAP2.3("west-yorkshire", 2020, "MSOA11CD", "incomeH", ntrain = train[[i]], predNames = columnsPreds, data = dataWY)
-  SHAP_flags2 <- flagSHAP(shapRes,areas = sort(unique(dataWY$MSOA11CD))[train[[i]]])
+  SHAP_all2 <- flagSHAP(shapRes,areas = sort(unique(dataWY$MSOA11CD))[train[[i]]])
+  SHAP_flags2 <- SHAP_all2[[1]]
   SHAP_flags <- dplyr::bind_rows(SHAP_flags, SHAP_flags2)
   print("**********")
   print(paste(i,"/10",sep = ''))
@@ -138,9 +162,7 @@ cat_vars <- colnames(data)[c(7,13,17,18,20,21)]
 # |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv #
 
-##### 6. Add global evaluation for intersection approach
-########## 6.1 + spatial autocorrelation
-########## 6.2 max purity summary
+##### 6. Add spatial autocorrelation
 ##### 7. convert and export flagged output as JSON
 
 ##### 8. online documentation
