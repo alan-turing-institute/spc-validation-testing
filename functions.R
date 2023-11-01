@@ -1419,3 +1419,56 @@ flagsToJson <- function(flags, area, date){
 # nclust2 = 5
 # colNames = c("closeness_all","betweenness","distHPD","popDens","medAge","IMD19_ranks")
 ###### Toolbox for testing ######
+
+
+#######################################
+#######################################
+####### Spatial autocorrelation #######
+#######################################
+#######################################
+
+
+applyAutocor <- function(data, scale = c("LSOA11CD","MSOA11CD"), variable_name, plot = T){
+  scale = match.arg(scale)
+  ids <- unique(data[,scale])
+  if(scale == "MSOA11CD"){
+    if(!(file.exists(file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson")))){
+      print("Downloading geojson at MSOA scale...")
+      download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/MSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"))
+    }
+    data_json <- geojson_read(file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"), what = "sp")
+    spdf_region <- data_json[(data_json@data$MSOA11CD %in% ids),]
+    neigh <- poly2nb(spdf_region, queen=TRUE)
+    neigh_weigh <- nb2listw(neigh, style="W", zero.policy=TRUE)
+    variable <- NULL
+    for(i in spdf_region@data$MSOA11CD){
+      variable <- c(variable, mean(data[data[,scale] == i,variable_name], na.rm = T))
+    }
+    var_lag <- lag.listw(neigh_weigh, variable)
+    model <- lm(var_lag ~ variable)
+  } else if(scale == "LSOA11CD"){
+    if(!(file.exists(file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson")))){
+      print("Downloading geojson at LSOA scale...")
+      download.file("https://ramp0storage.blob.core.windows.net/nationaldata-v2/GIS/MSOA_2011_Pop20.geojson", destfile = file.path(folderIn,fdl,"MSOA_2011_Pop20.geojson"))
+    }
+    data_json <- geojson_read(file.path(folderIn,fdl,"LSOA_2011_Pop20.geojson"), what = "sp")
+    spdf_region <- data_json[(data_json@data$LSOA11CD %in% ids),]
+    neigh <- poly2nb(spdf_region, queen=TRUE)
+    neigh_weigh <- nb2listw(neigh, style="W", zero.policy=TRUE)
+    variable <- NULL
+    for(i in spdf_region@data$MSOA11CD){
+      variable <- c(variable, mean(data[data[,scale] == i,variable_name], na.rm = T))
+    }
+    var_lag <- lag.listw(neigh_weigh, variable)
+    model <- lm(Inc.lag ~ variable)
+  }
+  if(plot == T){
+    plot(var_lag ~ variable, pch=20, asp=1, las=1)
+    lines(variable[as.numeric(names(fitted(model)))],fitted(model), lwd = 3, col = 2)
+  }
+  print(paste("Moran I is ", round(model$coefficients[2],2)))
+  return(model$coefficients[2])
+}
+
+
+

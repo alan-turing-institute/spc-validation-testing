@@ -19,6 +19,7 @@ library(ggplot2)
 library(viridis)
 library(plotly)
 library(jsonlite)
+library(spdep)
 
 source("functions.R")
 
@@ -122,6 +123,10 @@ readFlags(all_flags, map = T, scale = "MSOA11CD")
 queryArea("E02002189", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, colNames)
 queryArea("E02002312", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, colNames)
 
+# Autocorrelation
+autocor <- applyAutocor(dataWY, scale = "MSOA11CD", "incomeH")
+
+
 
 #############################
 ##### Variable analysis #####
@@ -157,18 +162,19 @@ cat_vars <- colnames(data)[c(7,13,17,18,20,21)]
 ##### 5. write code to run indicators for a specific MSOA
 ########## 5.1 distributions
 ########## 5.2 maps
+##### 6. Add spatial autocorrelation
+##### 7. convert and export flagged output as JSON
 
 # |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #
 # |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv #
 
-##### 6. Add spatial autocorrelation
-##### 7. convert and export flagged output as JSON
+##### 8. Add renv
 
-##### 8. online documentation
-##### 9. journal paper
+##### 9. online documentation
+##### 10. journal paper
 
-##### 10. Distribution reshaping
+##### 11. Distribution reshaping
 
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ #
 # |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| #
