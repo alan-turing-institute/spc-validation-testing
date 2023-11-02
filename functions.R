@@ -1249,7 +1249,7 @@ mergeFlags <- function(flag1,flag2,weight = 1){
 }
 
 # It is now expected that data contains the column corresponding to the right scale
-queryArea <- function(name, flags, data, labels, scale, variable_name, nclust, nclust2 = nclust, colNames = colnames(labels)[2:ncol(labels), maps = T]){
+queryArea <- function(name, flags, data, labels, scale, variable_name, nclust, nclust2 = nclust, colNames = colnames(labels)[2:ncol(labels)], maps = T){
   readFlagsLine(flags[flags$area == name,])
   print("---------------------------------------------------------------------------------------------------------")
   # Get clusters
@@ -1392,7 +1392,8 @@ queryArea <- function(name, flags, data, labels, scale, variable_name, nclust, n
       geom_polygon(data = spdf_fortified_moments, aes( x = long, y = lat, group = group), fill=spdf_fortified_moments$col, color="white") +
       theme_void() + ggtitle(paste("Cluster",cid_m,"of moments",sep = " ")) +
       coord_map()
-    g5 <- NULL
+    df <- data.frame()
+    g5 <- ggplot(df) + geom_point() + xlim(0, 100) + ylim(0, 100) + annotate(geom="text", x=50, y=50, label=paste("Badness = ",round(flags$badness[flags$area == name]),sep = ""), hjust = 0.5, vjust = 0.5, fontface =2) + theme_void()
     g6 <- ggplot() +
       geom_polygon(data = spdf_fortified_labels, aes( x = long, y = lat, group = group), fill=spdf_fortified_labels$col, color="white") +
       theme_void() + ggtitle(paste("Cluster",cid_l,"of labels",sep = " ")) +
@@ -1406,7 +1407,6 @@ flagsToJson <- function(flags, area, date){
   jsonData <- prettify(jsonData)
   write(jsonData, paste("Output/flags_",area,"_",date,".json",sep = ""))
 }
-
 
 ###### Toolbox for testing ######
 # name = "E02002189"

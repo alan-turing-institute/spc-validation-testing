@@ -84,6 +84,8 @@ findNumberClusters(momentsWY, labelsWY, 3, 10)
 interWY <- clustMatching(momentsWY, labelsWY, nclust = 5, nclust2 = 5, skip = 13, flags = T)
 readFlags(interWY$flags, map = T, scale = "MSOA11CD")
 
+View(interWY$flags)
+
 # Plot results
 test <- extractCluster(momentsWY, nclust = 5)
 clusterMapping(test,"MSOA11CD")
@@ -138,6 +140,8 @@ readFlags(all_flags, over = 8000)
 readFlags(all_flags, map = T, scale = "MSOA11CD")
 
 # Area queries
+queryArea("E02002185", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, colNames)
+queryArea("E02002463", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, colNames)
 queryArea("E02002189", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, colNames)
 queryArea("E02002312", all_flags, dataWY, labels, "MSOA11CD", "incomeH", 5, 5, colNames)
 
