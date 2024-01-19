@@ -2,6 +2,8 @@
 
 WIP to create a robust data validation method for [SPC](https://github.com/alan-turing-institute/uatk-spc).
 
+Detailed paper expected on ArXiv by end of January.
+
 Use `create_environment.R` to set up the environment for both methods.
 
 ## Method 1: XAI-based approach
