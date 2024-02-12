@@ -80,6 +80,7 @@ columnsPreds <- c("closeness_all","betweenness","popDens","medAge","IMD19_ranks"
 
 # Run cluster intersection approach
 findNumberClusters(momentsWY, labelsWY, 3, 10)
+findNumberClusters(momentsWY, labelsWY, 5, 5)
 # Optimal: {3,4}, but let's take {5,5}
 interWY <- clustMatching(momentsWY, labelsWY, nclust = 5, nclust2 = 5, skip = 13, flags = T)
 readFlags(interWY$flags, map = T, scale = "MSOA11CD")
@@ -99,8 +100,54 @@ clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "inc
 clusterCaracFeature(testa, folderOut, fplot, data = dataWY, variable_name = "age", scale = "MSOA11CD", title = "labels", height = "find", width = 100, skip = 3,pdf = T)
 clusterCarac(testa, folderOut, fplot, title = "labels", pdf = T)
 #
-testb <- extractCluster(momentsWY, nclust = 10)
+testb <- extractCluster(momentsWY, nclust = 12)
 clusterCaracFeature(testb, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "moments_more", height = "find", width = 100, skip = 3,pdf = T)
+#
+testc <- extractCluster(momentsWY, nclust = 4)
+clusterCaracFeature(testc, folderOut, fplot, data = dataWY, variable_name = "incomeH", scale = "MSOA11CD", title = "moments_less", height = "find", width = 100, skip = 3,pdf = T)
+
+
+
+x_train <- as.matrix(predictors[,1:ncol(predictors)])
+y_train_mean <- momentsWY[, "mean"]
+y_train_sd <- momentsWY[, "sd"]
+y_train_skew <- momentsWY[, "skewness"]
+y_train_kurt <- momentsWY[, "kurtosis"]
+
+x_test <- as.matrix(predictors[testSet, 2:ncol(predictors)])
+
+model <- xgboost(data = x_train,label = y_train_mean, nround = 20,verbose = FALSE)
+pred <- predict(model, x_train)
+cor(pred,y_train_mean)^2
+
+model <- xgboost(data = x_train,label = y_train_sd, nround = 20,verbose = FALSE)
+pred <- predict(model, x_train)
+cor(pred,y_train_mean)^2
+
+model <- xgboost(data = x_train,label = y_train_skew, nround = 20,verbose = FALSE)
+pred <- predict(model, x_train)
+cor(pred,y_train_mean)^2
+
+model <- xgboost(data = x_train,label = y_train_kurt, nround = 20,verbose = FALSE)
+pred <- predict(model, x_train)
+cor(pred,y_train_mean)^2
+
+
+
+area_name = "west-yorkshire"
+date = 2020
+scale = "MSOA11CD"
+predictors <- loadLabels(area_name,date,scale)
+predictors <- predictors[order(predictors[,scale]),]
+row.names(predictors) <- 1:nrow(predictors)
+
+predictors <- predictors[,which(colnames(predictors) %in% columnsPreds)]
+
+variable_name = "incomeH"
+predictions <- dataWY[,c(variable_name,scale)]
+predictions <- predictions[complete.cases(predictions), ]
+
+row.names(momentsWY) == predictors$MSOA11CD
 
 # Run SHAP approach
 train <- rep(list(NULL),10)
@@ -130,8 +177,19 @@ png(file=file.path(folderOut,fplot,paste(title, "beeswarm_", variable_name, ".pn
 plot(shapRes[[1]], plot_type = "beeswarm", cex = 1)
 dev.off()
 
-pdf(file=file.path(folderOut,fplot,paste(title, "beeswarm_", variable_name, ".pdf", sep = "")), width= 3, height=10.75/5)
+title <- "beeswarm_"
+
+pdf(file=file.path(folderOut,fplot,paste(title, "mean_", variable_name, ".pdf", sep = "")), width= 4, height=10.75/5)
 plot(shapRes[[1]], plot_type = "beeswarm", cex = 1)
+dev.off()
+pdf(file=file.path(folderOut,fplot,paste(title, "sd_", variable_name, ".pdf", sep = "")), width= 4, height=10.75/5)
+plot(shapRes[[2]], plot_type = "beeswarm", cex = 1)
+dev.off()
+pdf(file=file.path(folderOut,fplot,paste(title, "skew_", variable_name, ".pdf", sep = "")), width= 4, height=10.75/5)
+plot(shapRes[[3]], plot_type = "beeswarm", cex = 1)
+dev.off()
+pdf(file=file.path(folderOut,fplot,paste(title, "kurt_", variable_name, ".pdf", sep = "")), width= 4, height=10.75/5)
+plot(shapRes[[4]], plot_type = "beeswarm", cex = 1)
 dev.off()
 
 # Combined area flagging
