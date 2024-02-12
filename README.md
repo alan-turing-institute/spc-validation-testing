@@ -2,13 +2,15 @@
 
 WIP to create a robust data validation method for [SPC](https://github.com/alan-turing-institute/uatk-spc).
 
+Detailed paper expected on ArXiv by end of January.
+
 Use `create_environment.R` to set up the environment for both methods.
 
 ## Method 1: XAI-based approach
 
-We test how SHAP explains an xgboost model that predicts the four first moments of any distribution from potentially significant variables.
+We test how SHAP explains an xgboost model that predicts the first four moments of any distribution from potentially significant variables.
 
-<mark>Use `runXAI.R`. Still WIP but checked and improved to satisfactory levels. Version 1: use old package `shapr 2.2` (approved by CRAN) and use function `runSHAP` to produce results looking like [this](https://github.com/alan-turing-institute/spc-validation-testing/blob/main/Output/plots/west-yorkshire-2020-MSOA11CD-incomeH-feature_importance_gg.png). Version 2: use development package `shapr 2.3` (see setup) and use function `runSHAP2.3` to get results that look like [this](https://github.com/alan-turing-institute/spc-validation-testing/blob/main/Output/plots/west-yorkshire-2020-MSOA11CD-incomeH-60783745-feature_importance_beeswarm.png). Be aware that the instalation of the development package might be difficult on an overbearing system.</mark>
+<mark>Use `runXAI.R`. Still WIP but checked and improved to satisfactory levels. Version 1: use old package `shapr 2.2` (approved by CRAN) and use function `runSHAP` to produce results looking like [this](https://github.com/alan-turing-institute/spc-validation-testing/blob/main/Output/plots/west-yorkshire-2020-MSOA11CD-incomeH-feature_importance_gg.png) [deprecated]. Version 2: use development package `shapr 2.3` (see setup) and use function `runSHAP2.3` to get results that look like [this](https://github.com/alan-turing-institute/spc-validation-testing/blob/main/Output/plots/west-yorkshire-2020-MSOA11CD-incomeH-60783745-feature_importance_beeswarm.png). Be aware that the instalation of the development package might be difficult on an overbearing system.</mark>
 
 
 Explanatory variables included:
